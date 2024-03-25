@@ -1,0 +1,97 @@
+﻿@page "/"
+@using POS1.Utilities
+@using POS1.Data
+@using Microsoft.EntityFrameworkCore;
+@using System.Diagnostics
+
+
+@inject ApplicationDbContext dbContext
+@inject NavigationManager NavigationManager
+@inject POS1.Services.UserServices UserService
+<PageTitle>Home</PageTitle>
+
+<div>
+    <EditForm Model="@model" OnValidSubmit="Submit" FormName="User login">
+        <h2 class="fw-normal mb-3 pb-3" style="letter-spacing: 1px;">Sign into your user Account</h2>
+       
+        <div class="form-outline mb-4">
+            <label class="form-label" for="Username">Username</label>
+            <input type="text" id="Username" class="form-control form-control-lg" @bind-value="model.Username" placeholder="Username" />
+        </div>
+        <div class="form-outline mb-4">
+            <label class="form-label" for="Password">Password</label>
+
+            <input type="Password" id="Password" class="form-control form-control-lg" @bind-value="model.Password" placeholder="Password"  />
+        </div>
+        <div class="pt-1 mb-4">
+            <button class="btn btn-dark btn-lg btn-block" type="submit">Login</button>
+        </div>
+    </EditForm>
+</div>
+
+
+@if (users != null && users.Any())
+{
+    <ul>
+        @foreach (var user in users)
+        {
+            <li>@user.Username </li>
+        }
+    </ul>
+}
+else
+{
+    <p>No users found.</p>
+}
+
+@code{
+
+    User model = new User();
+    List<POS1.Data.User> users;
+
+    public class User
+    {
+        public string Username { get; set; }
+        public string Password { get; set; }
+
+    }
+    protected override void OnInitialized()
+    {
+        users = UserService.GetAllUsers();
+    }
+
+    // Handle form submission
+    private async Task  Submit()
+    {
+        // string a = model.Username;
+        // Console.WriteLine(a);
+        Console.WriteLine("model.Username");
+        Console.WriteLine(model.Username);
+        Console.WriteLine($"Form Submitted For: {model.Username} {model.Password}"); ;
+        Console.WriteLine("model Username");
+        if (!string.IsNullOrEmpty(model.Username) && !string.IsNullOrEmpty(model.Password))
+        {
+            Console.WriteLine("notnull"); 
+        
+        }
+            StateHasChanged();
+
+
+        // Perform user login authentication
+        // var loginSuccess = await UserService.LoginAsync(model.Username, model.Password);
+
+        // Redirect to dashboard if login successful
+        // if (loginSuccess)
+        // {
+        //     NavigationManager.NavigateTo("/dashboard");
+        // }
+        // else
+        // {
+        //     // Handle login failure (optional)
+        // }
+    }
+
+   
+      
+}
+ 
