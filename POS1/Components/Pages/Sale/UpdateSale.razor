@@ -1,0 +1,252 @@
+﻿@page "/updatesale/{SaleID}"
+@inject POS1.Services.SaleServices saleService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@using POS1.Data
+@rendermode InteractiveServer
+
+@if (sale != null)
+{
+    <div class="sale-detail">
+        <div class="flex-style">
+            <div><strong>Sale ID:</strong> @sale.SaleID.ToString("D2")</div>
+            <div><strong>User ID:</strong> @sale.UserID.ToString("D2")</div>
+        </div>
+        <div class="flex-style">
+            <div><strong>Tenant ID:</strong> @sale.TenantID.ToString("D2")</div>
+            <div><strong>Sale Date/Time:</strong> @saleService.FormatSaleDateTime(sale.SaleDateTime)</div>
+        </div>
+
+        <h4 class="heading-3 ">Sale Items:</h4>
+        @if (sale.SaleItems != null && sale.SaleItems.Any())
+        {
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Product ID</th>
+                        <th>Product Name</th>
+                        <th>Quantity</th>
+                        <th>Quantity Unit</th>
+                        <th>Unit Price</th>
+                        <th>Total Price</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var saleItem in sale.SaleItems)
+                    {
+                        <tr >
+                            <td>@saleItem.Product.Id</td>
+                            <td>@saleItem.Product.Name</td>
+                            <td>@saleItem.Quantity</td>
+                            <td>@saleItem.QuantityUnit</td>
+                            <td>@saleService.FormatPrice(saleItem.UnitPrice)</td>
+                            <td>@saleService.FormatPrice(saleItem.TotalPrice)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            
+            <div class="heading-3 "><strong>Discount:</strong> @saleService.FormatPrice(sale.Discount)</div>
+            <div class="heading-3 "><strong>Total Amount:</strong> @saleService.FormatPrice(sale.TotalAmount)</div>
+        }
+        else
+        {
+            <p>No sale items found.</p>
+        }
+    </div>
+}
+else
+{
+    <p>No sale found with ID: @SaleID</p>
+}
+ 
+ <POS1.Components.Pages.Inventory.SearchProduct FilteredProducts="@filteredProducts" OnProductAndStockSelected="HandleSaleSelected"
+    ShouldPassStock="true" />
+ 
+@if (saleItems != null && saleItems.Any())
+{
+    <h4 >Selected Products:</h4>
+    <table class="table  table-hover">
+        <thead>
+            <tr>
+                <th>Product Name</th>
+                <th>Quantity Available</th>
+                <th>Unit Price</th>
+                <th>Quantity</th>
+                <th>Quantity Unit</th>
+                <th>Total Price</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var saleItem in saleItems)
+            {
+                <tr>
+                    <td>@saleItem.Product.Name</td>
+                     <td>@saleItem.stock.QuantityAvailable</td>
+                    <td>@saleService.FormatPrice(saleItem.stock.SalePrice)</td> 
+                    <td>
+                        <input type="number" class="quantityInput" min="0.1" step="0.01" max="@saleItem.stock.QuantityAvailable" @bind:get="@saleItem.Quantity" @bind:event="oninput" @bind:set="(value) => UpdateQuantity(saleItem, value)" 
+                              
+                        />
+                    </td>
+                   <td>@saleItem.QuantityUnit</td>
+                    <td>
+                        <input type="number" class="totalPriceInput" step="0.01" min="0.1"  
+                        @bind:get="@saleItem.TotalPrice" @bind:event="oninput"
+@bind:set="(value) => UpdateTotalPrice(saleItem, value)" />
+                    </td> 
+
+                    <td><button class="btn btn-danger" @onclick="() => RemoveSaleItem(saleItem)">Remove</button></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <div class="discount">
+        <span>
+            <strong> Discount:</strong>
+            <input type="number" min="0.01" step="0.01" class="discountinput " id="discount" value="@Discount" @oninput="e => UpdateDiscount(e)" />
+        </span>
+    </div>
+    <div class="totalAmount">Total: @saleService.FormatPrice(CalculateTotalAmount(Discount))</div>
+    <button class="btn btn-primary updateBtn" @onclick="() => updateSale(saleItems)">Update Sale</button>
+}
+
+@code {
+    [Parameter]
+    public string SaleID { get; set; }
+    private List<Product> filteredProducts;
+    private Sale sale;
+    private List<SaleItem> saleItems = new List<SaleItem>();
+    private double Discount { get; set; }
+    private string errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrEmpty(SaleID))
+        {
+            if (int.TryParse(SaleID, out int saleId))
+            {
+                var userName = await CookieUtility.GetUserFromCookieAsync(httpContextAccessor);
+                var user = await userService.GetUserByUsernameAsync(userName);
+
+                 sale = await saleService.GetSaleByIdAsync(saleId,user.TenantID);
+   
+            }
+            else
+            {
+                errorMessage = "Invalid Sale ID.";
+            }
+        }
+    }
+
+    private void HandleSaleSelected((Product product, Stock stock) selectedProduct)
+    {
+        var product = selectedProduct.product;
+        var stock = selectedProduct.stock;
+
+        var existingSaleItem = saleItems.FirstOrDefault(si => si.Product.Id == product.Id && si.StockId == stock.ID);
+        if (existingSaleItem == null)
+        {
+            var newSaleItem = new SaleItem
+                {
+                    ProductID = product.Id,
+                    Product = product,
+                    StockId = stock.ID,
+                    stock = stock,
+                    Quantity = 0,
+                    QuantityUnit = product.QuantityUnit.ToString(),
+                    UnitPrice = stock.SalePrice,
+                    TotalPrice = 0,
+                    TenantID = product.TenantId,
+                };
+            saleItems.Add(newSaleItem);
+        }
+        else
+        {
+            if (stock.QuantityAvailable > existingSaleItem.Quantity)
+            {
+                existingSaleItem.Quantity++;
+                existingSaleItem.TotalPrice = existingSaleItem.Quantity * existingSaleItem.UnitPrice;
+            }
+        }
+        StateHasChanged();
+    }
+     
+    public void UpdateQuantity(SaleItem saleItem, double value)
+    { 
+        saleItem.Quantity = Math.Clamp(value, 0, saleItem.stock.QuantityAvailable);
+          
+            saleItem.TotalPrice = Math.Round(saleItem.Quantity * saleItem.UnitPrice, 2);
+        StateHasChanged();
+    }
+
+    private void UpdateTotalPrice(SaleItem saleItem, double value)
+    {
+        double maxPrice = Math.Round(saleItem.stock.QuantityAvailable * saleItem.stock.SalePrice, 2);
+   
+        saleItem.TotalPrice = Math.Clamp(value, 0, maxPrice);
+         saleItem.Quantity = Math.Round(value / saleItem.UnitPrice, 2);
+        
+        StateHasChanged();
+    }
+
+    private double CalculateTotalAmount(double Discount)
+    {
+        double a = saleItems.Sum(si => si.TotalPrice);
+        return a - Discount;
+    }
+
+    private void RemoveSaleItem(SaleItem saleItem)
+    {
+        saleItems.Remove(saleItem);
+        StateHasChanged();
+    }
+
+    private async Task updateSale(List<SaleItem> saleItems)
+    {
+   
+
+
+         var result = await saleService.UpdateSaleAsync(sale, saleItems ,Discount);
+         if (result != null)
+         { 
+            NavigationManager.NavigateTo($"/sale/{result.SaleID}");
+         }
+         else
+         {
+             throw new InvalidOperationException("something went wrong Please try again!");
+         }
+    }
+
+    private void UpdateDiscount(ChangeEventArgs e)
+    {
+        var input = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            Discount = 0;
+        }
+
+        if (double.TryParse(e.Value.ToString(), out double discount))
+        {
+            Discount = Math.Max(discount, 0);  
+            StateHasChanged();
+        }
+
+    }
+     
+
+}
+
+<style>
+    .sale-detail {
+        padding: 5px;
+        border-radius: 5px;
+        margin-bottom: 40px;
+        background-color: #ffffff;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+        transition: box-shadow 0.3s ease;
+    }
+
+
+</style>

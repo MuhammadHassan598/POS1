@@ -1,0 +1,138 @@
+﻿
+@rendermode InteractiveServer
+
+@inject IJSRuntime JSRuntime
+ 
+ 
+<div class="search">
+
+    <input class="search-input-style form-control" type="text" placeholder="Search by name " @bind="searchQuery" @oninput="HandleSearchInput" />
+    <input class="search-input-style form-control" type="number" min="0" placeholder="Search by ProductID" @bind="searchProductId" @oninput="HandleSearchProductIdInput" />
+</div>
+
+@if (filteredProducts != null && filteredProducts.Any())
+{
+    <table class="table  table-hover">
+        <thead>
+            <tr>
+                <th>Product Id</th>
+                <th>Product Name</th>
+                <th>Quantity Available</th>
+                <th>Quantity Unit</th>
+                <th>Price</th>
+                <th>SalePrice</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var product in filteredProducts)
+            {
+                foreach (var stock in product.Stocks)
+                {
+                    @if (stock.QuantityAvailable > 0 || stock.CostPrice == 0)
+                    {
+               <tr @onclick="() => AddToReceipt(product,stock)">
+                    <td>@product.Id</td>
+                    <td>@product.Name</td>
+                  <td>@stock.QuantityAvailable</td>
+                        <td>@product.QuantityUnit</td>
+                        <td>@saleService.FormatPrice(@stock.CostPrice)</td>
+                        <td>@saleService.FormatPrice(@stock.SalePrice)</td>
+                    </tr>
+               }
+            }}
+        </tbody>
+    </table>
+} 
+else if (!string.IsNullOrWhiteSpace(searchQuery) || !string.IsNullOrWhiteSpace(searchProductId))
+{
+    <p>No matching items found.</p>
+}
+
+
+@code {
+    private List<Product>? products;
+    // protected List<Product>? filteredProducts;
+    [Parameter]
+    public List<Product> filteredProducts { get; set; }
+    private string searchQuery = "";
+    private string searchProductId = "";
+    public List<Stock> stocks { get; set; }
+    [Parameter]
+    public EventCallback<Product> OnProductSelected { get; set; } 
+    [Parameter]
+    public EventCallback<(Product product, Stock stock)> OnProductAndStockSelected { get; set; }
+    [Parameter]
+    public bool ShouldPassStock { get; set; } = true;
+ 
+private async Task AddToReceipt(Product product,Stock stock)
+{
+       
+        if (ShouldPassStock )
+        {
+
+            await OnProductAndStockSelected.InvokeAsync((product, stock));
+        }
+        else
+        {
+            
+            await OnProductSelected.InvokeAsync(product);
+        }
+
+     
+        searchQuery = "";
+        searchProductId = "";
+}
+
+    private async Task HandleSearchInput(ChangeEventArgs e)
+    {
+        searchQuery = e.Value.ToString();
+        await PerformSearch();
+    }
+
+    private async Task HandleSearchProductIdInput(ChangeEventArgs e)
+    {
+        searchProductId = e.Value.ToString();
+        await PerformSearch();
+    }
+
+    private async Task PerformSearch()
+    {
+        if (!string.IsNullOrWhiteSpace(searchQuery) || !string.IsNullOrWhiteSpace(searchProductId))
+        {
+            // Filter products based on the search criteria
+            filteredProducts = products.Where(p =>
+                (string.IsNullOrWhiteSpace(searchQuery) || p.Name.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)) &&
+                (string.IsNullOrWhiteSpace(searchProductId) || p.Id.ToString() == searchProductId)
+            ).ToList();
+        }
+        else
+        {
+            // No search criteria provided, show no products
+            filteredProducts = new List<Product>();
+        }
+        if (filteredProducts == null || !filteredProducts.Any())
+        {
+            StateHasChanged();
+        }
+    }
+
+     
+    protected override async Task OnInitializedAsync()
+    {
+        var userName = await CookieUtility.GetUserFromCookieAsync(httpContextAccessor);
+        var user = await userService.GetUserByUsernameAsync(userName);
+        products = await productService.GetActiveProductsByTenantIdAsync(user.TenantID);
+
+        var productIds = products.Select(p => p.Id).ToList();
+        stocks = await stockService.GetStocksByProductIdsAsync(productIds, user.TenantID);
+
+
+        foreach (var product in products)
+        {
+            product.Stocks = stocks.Where(s => s.ProductId == product.Id).ToList();
+        }
+        await PerformSearch();
+    }
+
+    
+}

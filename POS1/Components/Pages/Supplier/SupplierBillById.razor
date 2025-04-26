@@ -1,0 +1,128 @@
+﻿
+@page "/suppliersbill/{id}"
+@rendermode InteractiveServer
+@inject IJSRuntime JSRuntime
+<div class="top-row-section">
+<h3 class="heading-1">Bill</h3>
+<div>
+        <button class=" btn btn-outline-primary btn-style " @onclick="NavigateToProfilePage">
+           Back To Profile
+        </button>
+    <button class="btn btn-outline-primary btn-style " @onclick="NavigateToUpdatePage">
+   Update Bill
+</button>
+    <button class=" btn btn-outline-primary btn-style " @onclick="NavigateToReturnPage">
+   Return
+        </button>  <button class="btn btn-outline-primary btn-style" @onclick="PrintBill">Print</button>
+
+    </div>
+
+
+</div>
+
+
+@if (supplierBill!=null)  
+
+{
+    <div class="heading-2">
+        <div class="flex-style">
+            <div> <strong>Bill Id: </strong> @supplierBill.Id</div>
+            <div> <strong> Bill Date:</strong>@saleService.FormatSaleDateTime(@supplierBill.OrderDate)</div>
+        </div>
+        <div class="flex-style">
+            <div> <strong> Total Amount:</strong>@saleService.FormatPrice(@supplierBill.TotalAmount)</div>
+        </div>
+
+        <table class="table  table-hover">
+            <thead>
+                <tr>
+                    <td>Bill_Item Id</td>
+                    <td> Product Name</td>
+                    <td>Quantity</td>
+                      <td>Quntity Unit</td>
+                    <td>Price</td>
+                    <td>Total Price</td>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in supplierBill.SupplierItems)
+                {
+                    <tr>
+                        <td>@item.Id</td>
+                        <td>@item.Product.Name</td>
+                        <td>@item.QuantityReceived</td>
+                        <td>@item.Product.QuantityUnit</td>
+                        <td>@saleService.FormatPrice(@item.UnitPrice)</td>
+                        <td>@saleService.FormatPrice(@item.TotalPrice)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+}
+@code {
+    [Parameter]
+    public string id { get; set; }
+    private  SuppliersBill supplierBill;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrEmpty(id))
+        {
+            var userName = await CookieUtility.GetUserFromCookieAsync(httpContextAccessor);
+            var user = await userService.GetUserByUsernameAsync(userName);
+
+
+            if (int.TryParse(id, out int Id))
+            {
+                supplierBill = await supplierBillsService.GeSupplierBillByIdAsync(Id,user.TenantID);
+
+            }
+        }
+    }
+
+
+    private void NavigateToUpdatePage()
+    {
+        NavigationManager.NavigateTo($"/suppliersbill/update/{id}");
+    }
+
+    private void NavigateToReturnPage()
+    {
+        NavigationManager.NavigateTo($"/suppliersbill/return/{id}");
+    }
+
+    private void NavigateToProfilePage()
+    {
+        NavigationManager.NavigateTo($"/supplierprofile/{supplierBill.SupplierId}");
+    }
+    private async Task PrintBill()
+    {
+        var billData = new
+        {
+
+            tenantName = supplierBill.Tenant.Name,
+            tenantAddress = supplierBill.Tenant.Address,
+            tenantPhone = supplierBill.Tenant.ContactInformation,
+            saleId = supplierBill.Id.ToString("D2"),
+            saleDate = saleService.FormatSaleDateTime(supplierBill.OrderDate),
+            supplierName = supplierBill?.Supplier.Name ?? "",
+        
+            totalAmount = saleService.FormatPrice(supplierBill.TotalAmount),
+            products = supplierBill.SupplierItems.Select(item => new
+            {
+                name = item.Product.Name,
+                quantity = item.QuantityReceived,
+                quantityUnit = item.Product.QuantityUnit,
+                rate = saleService.FormatPrice(item.UnitPrice),
+                amount = saleService.FormatPrice(item.TotalPrice)
+            }).ToList()
+        };
+        await JSRuntime.InvokeVoidAsync("printSupplierBill", billData);
+    }
+
+}
+
+

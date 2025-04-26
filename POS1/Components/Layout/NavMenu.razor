@@ -1,0 +1,77 @@
+﻿
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">
+            @if (user?.Tenant != null)
+            {
+                @user.Tenant.Name
+            }
+            else
+            {
+                <span>Loading...</span>  
+            }
+        </a>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="/dashboard">
+                <span class="bi bi-bar-chart-fill" aria-hidden="true"></span>
+
+                Dashboard
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="/products">
+                <span class="bi bi-card-list" aria-hidden="true"></span> Products
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="/addproducts">
+                <span class="bi bi-bag-plus-fill" aria-hidden="true"></span> Add Product
+            </NavLink> 
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="createsale">
+                <span class="bi bi-cart-plus-fill" aria-hidden="true"></span> Create Sale
+            </NavLink> 
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="sales">
+                <span class="bi bi-card-list" aria-hidden="true"></span> All Sales
+            </NavLink> 
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="customers">
+                <span class="bi bi-person-lines-fill" aria-hidden="true"></span>Customers
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="updatestock">
+                <span class="bi bi-database-fill-add" aria-hidden="true"></span>Add Stock
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="suppliers">
+                <span class="bi bi-person-lines-fill" aria-hidden="true"></span>Suppliers
+            </NavLink>
+        </div>
+    </nav>
+</div>
+
+
+
+@code {
+    public User user;
+    protected override async Task OnInitializedAsync()
+    {
+        var userName = await CookieUtility.GetUserFromCookieAsync(httpContextAccessor);
+        user = await userService.GetUserByUsernameAsync(userName);
+    }
+}

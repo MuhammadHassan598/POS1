@@ -1,0 +1,96 @@
+﻿@page "/inactive_products"
+@rendermode InteractiveServer
+@inject IJSRuntime JSRuntime
+
+
+
+<style>
+    .checkbox{
+        border-radius:50%;
+        height:38px;
+        width:38px;
+    }
+
+    td {
+        font-size: 20px;
+    }
+</style>
+<h3>InActiveProducts</h3>
+
+ 
+<div id="productList">
+    @if (products != null)
+    {
+        <table class="table  table-hover">
+            <thead>
+                <tr>
+                    <th>Activate </th>
+
+                    <th>Product ID</th>
+                    <th>Name</th>
+                    <th>ProductType</th>
+                    <th>Quantity Unit</th>
+                    <th>Barcode</th>
+                
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var product in products)
+                {
+                    <tr>
+                   <td> 
+                            <input class="checkbox" type="checkbox" @onchange="(e) => ActivateProduct(product, ((ChangeEventArgs)e).Value as bool?)" />
+
+                   </td>
+                        <td>@product.Id</td>
+                        <td>@product.Name</td>
+                        <td>@product.ProductType.TypeName</td>
+                        <td>@product.QuantityUnit</td>
+                        <td>@product.Barcode</td>
+                        
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+    }
+    else
+    {
+        <p>No matching items found.</p>
+    }
+</div>
+
+@code {
+    private List<Product>? products;
+    private List<ProductType>? prodType;
+    private List<Product>? filteredProducts { get; set; }
+    private string searchQuery = "";
+    private string searchProductId = ""; 
+    private string searchQuantity = "";
+    private string selectedProductType = "";
+    private int id;
+    private User user;
+
+    // get username from cookies and then used to get user and get product types and inactive products on initialization
+    protected override async Task OnInitializedAsync()
+    {
+        var userName = await CookieUtility.GetUserFromCookieAsync(httpContextAccessor);
+        user = await userService.GetUserByUsernameAsync(userName);
+        products = await productService.GetInActiveProductsByTenantIdAsync(user.TenantID);
+    }
+
+
+    // Method to activate the product
+    private async Task ActivateProduct(Product product, bool? isChecked)
+    {
+        var productId = product.Id;
+        if (isChecked == true)
+        {
+             var result=  await productService.ActiveDeleteProductAsync(product,user);
+             if (result)
+             {
+                NavigationManager.NavigateTo($"/products");
+             }
+        }
+    }
+}

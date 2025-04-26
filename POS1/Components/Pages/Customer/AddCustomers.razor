@@ -1,0 +1,95 @@
+﻿ 
+@rendermode InteractiveServer
+
+
+<div class="modal-overlay">
+    <div class="overlay-card">
+        <div class="top-row-section">
+            <h3 class="heading-1">Add Customer</h3>
+            <button class="close-button" @onclick="CloseModal">X</button>
+       </div>
+
+        @if (!string.IsNullOrEmpty(SuccessMessage))
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Success" Variant="Variant.Flat" Shade="Shade.Lighter" Closeable="true"
+                         Style="font-size: 16px; font-weight: 500;">
+                @SuccessMessage
+            </RadzenAlert>
+        }
+        else if (!string.IsNullOrEmpty(ErrorMessage))
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Danger" Variant="Variant.Flat" Shade="Shade.Lighter" Closeable="true"
+                         Style="font-size: 16px; font-weight: 500;">
+                @ErrorMessage
+            </RadzenAlert>
+        }
+
+
+<EditForm Model="@customer">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div>
+
+                <InputText id="Name" class="card-input form-control" @bind-Value="customer.Name" placeholder="Enter customer name" Required />
+
+                <InputText id="Address" class="card-input form-control" @bind-Value="customer.Address" placeholder="Enter customer address"  />
+                <input type="tel" id="Phone" class="card-input form-control" @bind-value="customer.Phone" maxlength="11" placeholder="Enter phone number" pattern="03\d{9}|0\d{9}"  />
+
+                <InputText type="text" id="cnic" class="card-input form-control"
+                               placeholder="31300-1122334-4" @bind-Value="customer.Cnic" maxlength="15" @oninput="FormatCnic" />
+        
+
+                <button type="submit" class="btn btn-primary center-btn " @onclick="addCustomer">Add Customer</button>
+    </div>
+</EditForm>
+    
+</div>
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback CloseMethod { get; set; }
+    public POS1.Data.Customer customer { get; set; } = new();
+    public string SuccessMessage { get; set; }
+    public string ErrorMessage { get; set; }
+
+    public async Task addCustomer()
+    {
+        var userName = await CookieUtility.GetUserFromCookieAsync(httpContextAccessor);
+        var userData = await userService.GetUserByUsernameAsync(userName);
+        customer.TenantId = userData.TenantID;
+        var result =  await customerService.AddCustomer(customer);
+        if (result==true)
+        {
+
+            SuccessMessage = "Customer added successfully!";
+        }
+        else
+        {
+            ErrorMessage = "Something wrong.Please try again!";
+        }
+
+    }
+
+    private async Task CloseModal()
+    {
+        await CloseMethod.InvokeAsync();
+    }
+
+    private void FormatCnic(ChangeEventArgs e)
+    {
+        string input = e.Value.ToString().Replace("-", ""); // Remove existing dashes
+        if (input.Length > 5)
+        {
+            input = input.Insert(5, "-"); // Insert first dash
+        }
+        if (input.Length > 13)
+        {
+            input = input.Insert(13, "-"); // Insert second dash
+        }
+
+        customer.Cnic = input;
+    }
+
+}

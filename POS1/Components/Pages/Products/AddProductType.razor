@@ -1,0 +1,92 @@
+﻿
+@inject POS1.Services.ProductTypeServices productTypeService
+@inject IHttpContextAccessor httpContextAccessor
+@inject POS1.Services.UserServices userService
+@using POS1.Data 
+@rendermode InteractiveServer
+@inject IJSRuntime JSRuntime
+ 
+<div class="modal-overlay">
+    <div class="overlay-card">
+
+        <div class="top-row-section">
+            <h4 class="heading-1">Add Product Type</h4>
+        <button class="close-button" @onclick="CloseModal">X</button>
+        </div>
+      
+        <input type="text" placeholder="Enter Product Type Name" class="form-control" @bind="productTypeName" required />
+
+        @if (!string.IsNullOrWhiteSpace(ShowError))
+        {
+            <p class="text-danger">@ShowError</p>
+        }
+        @if (!string.IsNullOrWhiteSpace(ShowSuccess))
+        {
+            <p class="text-success">@ShowSuccess</p>
+        }
+        <button class="btn btn-primary center-btn" @onclick="AddType">Add Product Type</button>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback CloseMethod { get; set; }
+    private string productTypeName;
+    public string ShowError { get; set; } = ""; 
+    public string ShowSuccess { get; set; } = "";
+
+    private string RetrieveUserNameFromCookie()
+    {
+        var httpContext = httpContextAccessor.HttpContext;
+        if (httpContext.Request.Cookies.TryGetValue("LoginName", out var userName))
+        {
+            return userName;
+        }
+        return "Guest";
+    }
+
+    private async Task AddType()
+    {
+        if (!string.IsNullOrWhiteSpace(productTypeName))
+        {
+            var userName = RetrieveUserNameFromCookie();
+            var user = await userService.GetUserByUsernameAsync(userName);
+            var productType = new ProductType { TypeName = productTypeName, TenantId = user.TenantID };
+            await productTypeService.CreateProductTypeAsync(productType);
+
+            productTypeName = string.Empty;
+            ShowSuccess = "Product type added successfully!";
+            ShowError = "";
+        }
+        else
+        {
+
+            productTypeName = string.Empty;
+            ShowError = "Product type name cannot be empty!";
+            ShowSuccess = "";
+            // Handle empty input error
+            // Optionally, display a validation message to the user
+        }
+    }
+
+    private async Task CloseModal()
+    {
+        await CloseMethod.InvokeAsync();
+    }
+
+}
+
+<style>
+    .text-danger, .text-success {
+        font-weight:700;
+        font-size:18px;
+    }
+    .form-control{
+    font-size: 18px;
+    margin: 30px  4px 20px 0 ;
+    font-weight: 500;
+    height: 50px;
+    border-radius: 10px;
+    border-color: #d3ddf5;
+    }
+</style>

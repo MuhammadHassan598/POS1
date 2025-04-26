@@ -1,0 +1,140 @@
+﻿@page "/sales"
+@rendermode InteractiveServer
+@inject POS1.Services.SaleServices saleService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+<style>
+    .sales-container {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .sale-item {
+        border: 1px solid #ccc;
+        padding: 10px;
+        border-radius: 5px;
+        display: flex;
+        cursor: pointer;
+        height:60px;
+    align-items:center;
+    }
+
+        .sale-item:hover {
+            background-color: #e0e4ed;
+        }
+    .sale-data {
+        margin-right: 4.5rem;
+        font-size: 18px;
+    }
+
+        .sale-data strong {
+            font-size: 16px;
+            padding-right: 8px;
+        }
+ 
+</style>
+
+
+ 
+
+<h2>Sales</h2>
+<div class="search">
+    <input class="search-input-style form-control" type="text" placeholder="Search sale " @bind="query" @oninput="HandleSearchSaleIdInput" />
+
+</div>
+
+@if (filteredSales != null && filteredSales.Any())
+{
+    <div class="sales-container">
+
+        @* <div class="sale-item" @onclick="() => SelectSale(sale.SaleID)">
+                <div class="sale-data"><strong>Sale ID:</strong> @sale.SaleID.ToString("D2")</div>
+
+                <div class="sale-data"><strong>Sale Date:</strong> @saleService.FormatSaleDateTime(sale.SaleDateTime)</div>
+                <div class="sale-data"><strong>Total Bill:</strong> @saleService.FormatPrice(sale.TotalAmount)</div>
+            </div>
+ *@
+
+        <table class="table  table-hover">
+            <thead>
+                <tr>
+                    <th>Sale ID</th>
+                    <th>Sale Date</th>
+                    <th>Total Bill</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var sale in filteredSales)
+                {
+                    <tr @onclick="() => SelectSale(sale.SaleID)">
+                        <td>@sale.SaleID.ToString("D2")</td>
+                        <td>@saleService.FormatSaleDateTime(sale.SaleDateTime)</td>
+                        <td>@saleService.FormatPrice(sale.TotalAmount)</td>
+                    </tr>}
+                </tbody>
+            </table>
+
+        
+    </div>
+}
+else if (!string.IsNullOrWhiteSpace(query))
+{
+    <p>No matching sales found.</p>
+}
+@code {
+    private List<POS1.Data.Sale> sales;
+    private List<POS1.Data.Sale> filteredSales;
+    private string query = "";
+
+    [Parameter]
+    public string SaleId { get; set; }
+
+    private void SelectSale(int saleId)
+    {
+   
+
+        NavigationManager.NavigateTo($"/sale/{saleId}");
+
+    }
+
+    private async Task HandleSearchSaleIdInput(ChangeEventArgs e)
+    {
+        query = e.Value.ToString();
+        await PerformSearch();
+    }
+
+
+    private async Task PerformSearch()
+    {
+    
+        if (!string.IsNullOrWhiteSpace(query))
+      {
+   
+            filteredSales = sales.Where(s =>
+      (string.IsNullOrWhiteSpace(query) ||
+      s.SaleID.ToString().Contains(query, StringComparison.OrdinalIgnoreCase) ||
+      s.SaleDateTime.ToString("yyyy-MM-dd").Contains(query, StringComparison.OrdinalIgnoreCase) ||
+      s.TotalAmount.ToString().Contains(query, StringComparison.OrdinalIgnoreCase))
+      ).ToList();
+
+        }
+         else
+         {
+ 
+         filteredSales = sales;
+         }
+
+        StateHasChanged(); 
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var userName = await CookieUtility.GetUserFromCookieAsync(httpContextAccessor);
+        var user = await userService.GetUserByUsernameAsync(userName);
+        var tenid = user.TenantID;
+
+         sales = await saleService.GetAllSalesByTenantIdAsync(tenid);
+         filteredSales = sales;
+    }
+}

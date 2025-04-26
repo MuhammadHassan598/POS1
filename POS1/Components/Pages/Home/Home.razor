@@ -1,0 +1,112 @@
+﻿@layout POS1.Components.Layout.LoginLayout
+@page "/"
+@using POS1.Utilities
+@using POS1.Data
+@using Microsoft.EntityFrameworkCore
+@using System.Diagnostics
+@inject IHttpContextAccessor httpContextAccessor
+@inject ApplicationDbContext dbContext
+@inject NavigationManager navigationManager
+@inject POS1.Services.UserServices UserService
+@inject IJSRuntime JSRuntime
+@rendermode InteractiveServer
+<style>
+    .input {
+        /* Define styles for form inputs */
+        width: 400px;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+        margin-bottom: 10px;
+        height: 3rem;
+        border-radius: 1rem;
+    }</style>
+<PageTitle>Home</PageTitle>
+<POS1.Components.Pages.AlertComponent ErrorMessage="@ErrorMessage"
+                                      SuccessMessage="@SuccessMessage" />
+<div class="form-container">
+    <div class="form-wrapper">
+        <form method="post" @onsubmit="Submit" @formname="user-login-form">
+            <AntiforgeryToken />
+            <div class="mb-3">
+                <label>
+                    Username:
+                    <InputText @bind-Value="Model!.Username" class="input form-control " required />
+                </label>
+            </div>
+            <div class="mb-3">
+                <label>
+                    Password:
+                    <InputText @bind-Value="Model!.Password" class=" input form-control " type="password" required />
+                </label>
+            </div>
+            <div class="mb-3">
+                <button type="submit" class="btn btn-style">
+                    @if (!isLoader) {
+                        <span> Login</span>
+                    }
+                    else
+                    {
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden"></span>
+                        </div>
+                    }
+                </button>
+            </div>
+        
+        </form>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    public User Model { get; set; } = new();
+    public string ErrorMessage { get; set; } 
+    public string SuccessMessage { get; set; }
+    public bool isLoader = false;
+    private async Task Submit()
+    {
+        try
+        {
+            isLoader = true; 
+
+            bool loginSuccess =  await UserService.LoginAsync(Model.Username, Model.Password);
+            if (loginSuccess) {
+
+                var httpContext = httpContextAccessor.HttpContext;
+                if (httpContext != null && httpContext.Response != null)
+                {
+                    await JSRuntime.InvokeVoidAsync("setCookie", "LoginName", Model.Username, 1);
+
+
+                    // httpContext.Response.Cookies.Append("LoginName", Model.Username, new CookieOptions { Expires = DateTimeOffset.Now.AddDays(1) });
+                    NavigationManager.NavigateTo("/dashboard");
+                }
+                isLoader = false;
+
+         
+                 }
+              else
+             {         isLoader = false;
+                SuccessMessage = null;
+                ErrorMessage = "Something went wrong.Please try again!";
+               Model = new User();
+
+             }
+        }catch(Exception ex){
+            SuccessMessage = null;
+            ErrorMessage = "Something went wrong.Please try again!";
+        }
+    }
+
+
+
+
+
+    public class User
+    {
+        public string? Username { get; set; }
+        public string? Password { get; set; }
+    }
+}

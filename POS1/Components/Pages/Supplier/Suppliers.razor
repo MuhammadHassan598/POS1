@@ -1,0 +1,119 @@
+﻿@page "/suppliers"
+@using POS1.Data
+@rendermode InteractiveServer
+@inject IJSRuntime JSRuntime
+
+<div class="top-row-section">
+
+    <h3 class="heading-1">Suppliers</h3>
+
+    <button class="btn btn-outline-primary btn-style" @onclick="AddSupplier">
+        Add Supplier
+    </button>
+
+</div>
+<div class="search">
+    <input type="text" name="search" @bind-value="query" placeholder="Search Supplier"
+           class="search-input-style  form-control" @oninput="FilterSuppliers" />
+
+</div>
+
+
+@if (suppliers != null)
+{
+    <div class="all-items">
+      @*   @foreach (var supplier in suppliers)
+        {
+            <div class="item-details" @onclick="()=>supplierPage(supplier)">
+                <div>
+                    <strong>Supplier Name:</strong>
+                    @supplier.Name
+                </div>
+                <div>
+                    <strong>Supplier Contact:</strong>
+                    @supplier.Phone
+                </div>
+                <div>
+                    <strong>Supplier Agent:</strong> @supplier.ContactAgent
+                </div>
+
+            </div>
+        }
+ *@
+
+
+        <table class="table  table-hover">
+            <thead>
+                <tr>
+                    <th>Supplier Name</th>
+                    <th>Supplier Contact</th>
+                    <th>Supplier Agent</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var supplier in suppliers)
+                {
+                    <tr @onclick="() => supplierPage(supplier)">
+                        <td>@supplier.Name</td>
+                        <td>@supplier.Phone</td>
+                        <td>@supplier.ContactAgent</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+
+
+
+
+    </div>
+
+}
+@code {
+    private List<Supplier> suppliers;
+    private List<Supplier> dupliSuppliers;
+    private string query;
+    protected override async Task OnInitializedAsync()
+    {
+        var userName = await CookieUtility.GetUserFromCookieAsync(httpContextAccessor);
+        var user = await userService.GetUserByUsernameAsync(userName);
+        suppliers = await supplierService.GetAllSuppliersByTenentId(user.TenantID);
+        dupliSuppliers = suppliers;
+    }
+
+    private void FilterSuppliers(ChangeEventArgs e)
+    {
+        query = e.Value.ToString();
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            suppliers = dupliSuppliers;
+        }
+        else
+        {
+            suppliers = dupliSuppliers.Where(s => s.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                                                 s.Phone.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                                                 s.ContactAgent.Contains(query, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+    }
+
+
+
+
+    public void supplierPage(Supplier supplier)
+    {
+        NavigationManager.NavigateTo($"/supplierprofile/{supplier.Id}");
+    }
+
+
+    public void AddSupplier()
+    {
+        NavigationManager.NavigateTo("/addsupplier");
+    }
+}
+
+
+<style>
+    .all-items {
+        margin-top: 20px;
+    }
+</style>

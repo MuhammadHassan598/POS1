@@ -1,0 +1,152 @@
+﻿@page "/customerprofile/{idString}"
+@rendermode InteractiveServer
+
+<style>
+     
+    .customer-bills {
+        margin: 15px 0 150px 0;
+    }
+
+</style>
+<div class="top-row-section">
+    <h2 class="heading-1">Customer Profile</h2>
+    <div>
+        <button class=" btn btn-outline-primary btn-style" @onclick="ShowDataModal">
+            View customer data
+        </button>
+        <button class=" btn btn-outline-primary btn-style" @onclick="PaymentHistory">
+           Payment history
+        </button>
+        <button class=" btn btn-outline-primary btn-style" @onclick="ShowPaymentModal">
+            Payment
+        </button>
+    </div>
+</div>
+
+
+@if (isPaymentModalVisible)
+{
+     <POS1.Components.Pages.SalePayment.SalesAccountPayment   CloseMethod="async () => ClosePaymentModal()" customerAccount="customerAccount" /> 
+}
+@if (isDataVisible)
+{
+    <POS1.Components.Pages.Customer.CustomerProfileData CloseMethod="async () => CloseDataModal()" customer="customer" />
+}
+ 
+<div class="search">
+    <input type="text"  value="@query"
+           placeholder="Search Bill"
+           class="search-input-style form-control" @oninput="FilterSuppliersBills" />
+</div>
+
+@if (sales != null && sales.Any())
+{
+    <div class="customer-bills">
+        @foreach (var sale in sales)
+        {
+            <div class="item-details" @onclick="()=>saleById(sale.SaleID)">
+                <div> <strong>ID: </strong>@sale.SaleID</div>
+                <div><strong>Date: </strong>@sale.SaleDateTime</div>
+                <div><strong>Bill Amount: </strong>@saleService.FormatPrice(@sale.TotalAmount)</div>
+            </div>
+        }
+    </div>
+}
+else
+{
+    <h3>No bill found!</h3>
+}
+@if (customerAccount != null)
+{
+    <div class="account">
+        <div class="amount-owed"> <strong>Total Amount: </strong>@saleService.FormatPrice(@customerAccount.TotalAmountBill)</div>
+        <div><strong>Amount Paid: </strong>@saleService.FormatPrice(@customerAccount.TotalAmountPaid)</div>
+        <div><strong>Remaining Amount: </strong>@saleService.FormatPrice(@customerAccount.RemainingAmount)</div>
+
+    </div>
+
+}
+
+
+
+
+@code {
+    [Parameter]
+    public string idString { get; set; }
+    private int id;
+    public Customer customer = new();
+    public CustomerAccount customerAccount;
+    public List<BillRefernce> BillRefernce { get; set; } = new();
+    public List<Sale> sales { get; set; } = new();
+    public List<Sale> searchSales { get; set; } = new();
+    public string query;
+    private bool isPaymentModalVisible = false;
+    private bool isDataVisible = false;
+
+    protected override async Task OnParametersSetAsync()
+    {
+
+        if (int.TryParse(idString, out id))
+        {
+            customer = await customerService.GetCustomerByIdAsync(id);
+            customerAccount = await customerAccountService.GetCustomerAccountByIdAsync(customer.Id, customer.TenantId);
+            BillRefernce = (await billReferenceService.GetAllBillRefernceBYCustomerId(id, customer.TenantId)).OrderByDescending(b => b.Id).ToList();
+            sales = BillRefernce.Select(b => b.Sale).ToList();
+            searchSales = sales;
+        }
+
+    }
+
+    public void FilterSuppliersBills(ChangeEventArgs e)
+    {
+        query = e.Value.ToString();
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            sales = searchSales;
+        }
+        else
+        {
+            sales = searchSales.Where(s =>
+      (string.IsNullOrWhiteSpace(query) ||
+      s.SaleID.ToString().Contains(query, StringComparison.OrdinalIgnoreCase) ||
+      s.SaleDateTime.ToString("yyyy-MM-dd").Contains(query, StringComparison.OrdinalIgnoreCase) ||
+      s.TotalAmount.ToString().Contains(query, StringComparison.OrdinalIgnoreCase))
+      ).ToList();
+        }
+    }
+
+    public void saleById(int id)
+    {
+        NavigationManager.NavigateTo($"/sale/{id}");
+
+    }
+
+    private void ShowPaymentModal()
+    {
+        isPaymentModalVisible = true;
+    }
+
+    private async Task ClosePaymentModal()
+    {
+        isPaymentModalVisible = false;
+        StateHasChanged();
+
+    }
+
+    private void ShowDataModal()
+    {
+        isDataVisible = true;
+    }
+
+    private async Task CloseDataModal()
+    {
+        isDataVisible = false;
+        StateHasChanged();
+
+    }
+
+    public void PaymentHistory()
+    {
+        NavigationManager.NavigateTo($"/payment/{customer.Id}/history");
+    }
+}

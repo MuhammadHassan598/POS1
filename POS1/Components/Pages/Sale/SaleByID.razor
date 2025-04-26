@@ -1,0 +1,261 @@
+﻿@page "/sale/{SaleID}"
+
+@rendermode InteractiveServer
+@inject IJSRuntime JSRuntime
+@using POS1.Data
+
+<div class="top-row-section">
+
+    <h3 class="heading-1 ">Sale Details:</h3>
+
+    <div>
+        @if (bill==null) {
+            <button class="btn btn-outline-primary btn-style" @onclick="NavigateBack">Back to Sales</button>
+        }
+        else
+        {
+            <button class="btn btn-outline-primary  btn-style" @onclick="NavigateBack">Back to Customer</button>
+        }
+        <button class="btn btn-outline-primary  btn-style" @onclick="NavigateUpdate">Update</button>
+        <button class="btn btn-outline-primary  btn-style " @onclick="NavigateReturn">Return Sale</button>
+        @if (bill == null && payment.Count == 0)
+        {
+            <button class="btn btn-outline-primary  btn-style" @onclick="ShowCardModal"> Add to Books</button>
+    }
+        @if (remainingAmount != 0 && bill == null)
+        {
+            <button class="btn btn-outline-primary  btn-style" @onclick="ShowSaleCardModal">Add Payment</button>
+        }
+
+        <button class="btn btn-outline-primary btn-style" @onclick="PrintBill">Print</button>
+
+    </div>
+</div>
+
+
+
+@if (isCardVisible)
+{
+    <POS1.Components.Pages.Customer.BillReference CloseMethod="async () => CloseCardModal()"  sale="sale"  />
+}
+@if (isSaleCardVisible)
+{
+    <POS1.Components.Pages.SalePayment.SalePayment CloseMethod="async () => CloseSaleCardModal()" sale="sale" RemainingAmount="@remainingAmount"   />
+}
+
+@if (sale != null)
+{
+    <div id="bill-section">
+        <div class="flex-style">
+          <div  ><strong>Sale ID:</strong> @sale.SaleID</div>
+            <div ><strong>User ID:</strong> @sale.UserID.ToString("D2")</div>
+       </div>
+        <div class="flex-style">
+            <div><strong>Tenant ID:</strong> @sale.TenantID.ToString("D2")</div>
+            <div><strong>Sale Date/Time:</strong> @saleService.FormatSaleDateTime(sale.SaleDateTime)</div>
+    </div>
+  
+        <div class="flex-style">
+        <div class="heading-3"><strong>Discount:</strong> @saleService.FormatPrice(sale.Discount)</div>
+        <div class="heading-3"><strong>Total Amount:</strong> @saleService.FormatPrice(sale.TotalAmount)</div>
+        </div>
+
+        @if (bill != null)
+        {
+            <div class="flex-style">
+                <div><strong>Customer Name:</strong> @bill.Customer.Name</div>
+                @if (!string.IsNullOrEmpty(bill?.Name))
+                {
+                    <div><strong>Reference Name:</strong> @bill.Name</div>
+                }
+            </div>
+        }
+
+
+        @if (sale.SaleItems != null && sale.SaleItems.Any())
+        { 
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Product ID</th>
+                            <th>Product Name</th>
+                            <th>Quantity</th>
+                        <th>Quantity Unit</th>
+                            <th>Unit Price</th>
+                            <th>Total Price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var saleItem in sale.SaleItems)
+                        {
+                            <tr>
+                            <td>@saleItem.Product.Id.ToString("D2")</td>
+                                <td>@saleItem.Product.Name</td>
+                                <td>@saleItem.Quantity</td>
+                            <td>@saleItem.QuantityUnit</td>
+                                <td>@saleService.FormatPrice(saleItem.UnitPrice)</td>
+                                <td>@saleService.FormatPrice(saleItem.TotalPrice)</td>
+                            </tr>
+                        }
+                </tbody>
+             
+                </table>
+
+        }
+        else
+        {
+            <p>No sale items found!.</p>
+        }
+    </div>
+    }
+else
+{
+    <p>No sale found with ID: @SaleID</p>
+}
+@if (bill == null)
+
+{
+    <div class=" account">
+        <div ><strong>Paid Amount:</strong> @saleService.FormatPrice(paidAmount)</div>
+        <div ><strong>Remaining Amount:</strong>  @saleService.FormatPrice(remainingAmount)</div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string SaleID { get; set; }
+    public BillRefernce bill{ get; set; }
+    public List<Payment> payment { get; set; } = new List<Payment>(); 
+    private POS1.Data.Sale sale;
+    public User user;
+    public double paidAmount=0;
+    public double remainingAmount=0;
+    private bool isCardVisible = false;
+    private bool isSaleCardVisible = false;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrEmpty(SaleID))
+        {
+            if (int.TryParse(SaleID, out int saleId))
+            {
+                var userName = await CookieUtility.GetUserFromCookieAsync(httpContextAccessor);
+                user = await userService.GetUserByUsernameAsync(userName);
+
+                sale = await saleService.GetSaleByIdAsync(saleId,user.TenantID);
+                if (sale != null)
+                {
+                    bill= await billReferenceService.GetBillRefernceBYSaleId(sale.SaleID, sale.TenantID);
+                    payment= await salePaymentService.GetPaymentsBySale(sale.SaleID,sale.TenantID);
+                    foreach(var item in payment)
+                    {
+                        paidAmount = Math.Round(paidAmount + item.AmountPaid, 2);
+                    }
+                    remainingAmount = Math.Round(sale.TotalAmount - paidAmount, 2);
+                }
+            }
+        }
+    }
+
+    private void NavigateBack()
+    {
+        if(bill==null){
+            NavigationManager.NavigateTo("/sales");
+        }
+        else
+        {
+            NavigationManager.NavigateTo($"/customerprofile/{bill.CustomerId}");
+        }
+    }
+
+    private void NavigateReturn()
+    {
+
+        if (!string.IsNullOrEmpty(SaleID))
+        {
+            NavigationManager.NavigateTo($"/returnsale/{SaleID}"); // Navigate to the return sale page with SaleID
+        }
+    }
+
+    private void NavigateUpdate()
+    {
+
+        if (!string.IsNullOrEmpty(SaleID))
+        {
+            NavigationManager.NavigateTo($"/updatesale/{SaleID}"); // Navigate to the return sale page with SaleID
+        }
+    }
+
+    private void ShowCardModal()
+    {
+        isCardVisible = true;
+    }
+
+    private async Task CloseCardModal()
+    {
+        isCardVisible = false;
+        StateHasChanged();
+
+    }
+
+    private void ShowSaleCardModal()
+    {
+        isSaleCardVisible = true;
+    }
+
+    private async Task CloseSaleCardModal()
+    {
+
+        isSaleCardVisible = false;
+        paidAmount = 0;
+
+        if (int.TryParse(SaleID, out int saleId))
+        {
+            sale = await saleService.GetSaleByIdAsync(saleId, user.TenantID);
+
+            if (sale != null)
+            {
+                bill = await billReferenceService.GetBillRefernceBYSaleId(sale.SaleID, sale.TenantID);
+                payment = await salePaymentService.GetPaymentsBySale(sale.SaleID, sale.TenantID);
+                foreach (var item in payment)
+                {
+                    paidAmount = Math.Round(paidAmount + item.AmountPaid, 2);
+                }
+                remainingAmount = Math.Round(sale.TotalAmount - paidAmount, 2);
+            }
+        }
+        StateHasChanged();
+
+    }
+
+    private async Task PrintBill()
+    {
+        var billData = new
+        {
+          
+            tenantName = sale.Tenant.Name,  
+            tenantAddress = sale.Tenant.Address,
+            tenantPhone = sale.Tenant.ContactInformation,     
+            saleId = sale.SaleID.ToString("D2"),
+            saleDate = saleService.FormatSaleDateTime(sale.SaleDateTime),
+          customerName = bill?.Customer.Name ?? "",
+            customerRefernce = bill?.Name ?? "",
+            discount=sale.Discount,
+            totalAmount = saleService.FormatPrice(sale.TotalAmount),
+            products = sale.SaleItems.Select(item => new
+            {
+                name = item.Product.Name,
+                quantity = item.Quantity,
+                quantityUnit = item.QuantityUnit,
+                rate = saleService.FormatPrice(item.UnitPrice),
+                amount = saleService.FormatPrice(item.TotalPrice)
+            }).ToList()
+        };
+        await JSRuntime.InvokeVoidAsync("printBill", billData);
+    }
+
+}
+
+
+        

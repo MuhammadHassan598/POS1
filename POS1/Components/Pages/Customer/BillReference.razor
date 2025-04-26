@@ -1,0 +1,95 @@
+﻿@rendermode InteractiveServer
+<div class="modal-overlay">
+    <div class="overlay-card">
+
+        <div class="top-row-section">
+            <h3 class="heading-1">Bill Reference</h3>
+            <button class="close-button" @onclick="CloseModal">X</button>
+        </div>
+
+        <POS1.Components.Pages.AlertComponent SuccessMessage="@SuccessMessage" ErrorMessage="@ErrorMessage" />
+     
+      
+
+            <div >
+
+           <RadzenStack Orientation="Orientation.Vertical"  JustifyContent="JustifyContent.Start" Gap="0rem" Style="margin-bottom:15px; "
+               >
+                <RadzenLabel Text="Customer:" Style="font-size:18px; font-weight:500; padding-right:8px; margin-bottom:10px;" />
+                  
+                    <RadzenDropDown Data="@customer"
+                                    TextProperty="Name"
+                                    ValueProperty="Id"
+                                    Placeholder="Select Customer"
+                                    AllowClear="true"
+                                    AllowFiltering="true"
+                                    @bind-Value="selectedCustomerId"
+                                Style="width: 100%; max-width: 400px; height:45px; font-size:18px; ">
+                    </RadzenDropDown>
+                </RadzenStack>
+ 
+                 
+                <input id="Name" class=" card-input form-control" @bind-value="billRefernce.Name" placeholder="Enter customer name" required />
+
+                <input type="tel" id="Phone" class="card-input form-control" @bind-value="billRefernce.number" maxlength="11" placeholder="Enter phone number" pattern="03\d{9}|0\d{9}" />
+      
+
+            <button type="submit" class="center-btn btn btn-primary  " @onclick="AddReference">Add Reference</button>
+            </div>
+    </div>
+ </div>
+ 
+
+@code {
+
+    [Parameter]
+    public EventCallback CloseMethod { get; set; }
+    [Parameter]
+    public Sale sale { get; set; }
+    public List<Customer> customer { get; set; } = new List<Customer>();
+    public BillRefernce billRefernce { get; set; } = new BillRefernce();
+    public int selectedCustomerId { get; set; }
+    public int tenantId { get; set; }
+    public string SuccessMessage { get; set; }
+    public string ErrorMessage { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var userName = await CookieUtility.GetUserFromCookieAsync(httpContextAccessor);
+        var user = await userService.GetUserByUsernameAsync(userName);
+        tenantId = user.TenantID;
+        customer = await customerService.GetAllCustomersByTenentId(user.TenantID);
+    }
+
+    private async Task CloseModal()
+    {
+        await CloseMethod.InvokeAsync();
+    }
+
+    public async void AddReference()
+    {
+        billRefernce.SaleId= sale.SaleID;
+        billRefernce.TenantId = tenantId;
+        billRefernce.CustomerId = selectedCustomerId;
+        if (billRefernce.CustomerId == 0 || string.IsNullOrEmpty(billRefernce.Name))
+        {
+            SuccessMessage = null;
+            ErrorMessage = "Please must enter customer and Reference name!";
+            return;
+        }
+
+        var result=  await billReferenceService.AddBillRefernce(billRefernce,sale);
+        if (result!=null)
+        {
+            ErrorMessage = null;
+            SuccessMessage = "Reference added successfully!";
+        }
+        else
+        {
+            SuccessMessage=null;
+            ErrorMessage = "Something wrong.Please try again!";
+        }
+        StateHasChanged();
+    }
+ 
+} 

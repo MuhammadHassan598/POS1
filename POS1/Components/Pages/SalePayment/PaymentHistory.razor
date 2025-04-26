@@ -1,0 +1,68 @@
+﻿@page "/payment/{ID}/history"
+@rendermode InteractiveServer
+<h3>PaymentHistory</h3>
+
+
+
+<table class="table table-hover">
+    <thead>
+        <tr>
+            <th>Payment Method</th>
+            <th>Payment Date</th>
+            <th>Amount Paid</th>
+            <th>Transaction ID</th>
+            <th>Payment Gateway</th>
+            <th>Bank Branch</th>
+            <th>Bank Name</th>
+            <th>Check Number</th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (payment != null && payment.Any())
+        {
+            @foreach (var item in payment)
+            {
+                <tr>
+                    <td>@item.PaymentMethod</td>
+                    <td>@saleService.FormatSaleDateTime(item.PaymentDate)</td>
+                    <td>@saleService.FormatPrice(item.AmountPaid)</td>
+                    <td>@item.TransactionId</td>
+                    <td>@item.PaymentGateway</td>
+                    <td>@item.BankBranch</td>
+                    <td>@item.BankName</td>
+                    <td>@item.CheckNumber</td>
+                </tr>
+            }
+        }
+        else
+        {
+            <tr>
+                <td colspan="8">No payments available.</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+
+
+
+
+
+@code {
+    [Parameter]
+    public string ID { get; set; }
+    private User user;
+    private List<Payment> payment;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (int.TryParse(ID, out int Id))
+        {
+            var userName = await CookieUtility.GetUserFromCookieAsync(httpContextAccessor);
+            user = await userService.GetUserByUsernameAsync(userName);
+            payment = await salePaymentService.GetPaymentsByAccount(Id, user.TenantID);
+        }
+    }
+
+
+}

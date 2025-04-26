@@ -1,0 +1,164 @@
+﻿@page "/products_stock"
+@inject POS1.Services.ProductTypeServices ProdtypeService
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+@inject IJSRuntime JSRuntime
+
+
+<div class="top-row-section">
+    <h3 class="heading-1">All Products</h3>
+
+    <div>
+        <button class="btn btn-outline-primary btn-style" @onclick="inActiveProducts"> InActive Products         </button>
+    </div>
+</div>
+
+<div class="search">
+    <input class="search-input-style  form-control" type="text" placeholder="Search product" @bind-value="query" @oninput="FilterProducts" />
+</div>
+@* <div id="productList"> *@
+@if (filteredProducts != null)
+{
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>Product ID</th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Total Qty</th>
+                <th>Available Qty</th>
+                <th>Qty Unit</th>
+                <th>Purchase Price(Pkr)</th>
+                <th>SalePrice(Pkr)</th>
+
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var product in filteredProducts)
+            {
+                foreach (var stock in product.Stocks)
+                {
+                    @if (stock.QuantityAvailable > 0 || stock.CostPrice == 0)
+                    {
+                        <tr @onclick="() => ProductNavigate(product.Id)">
+                            <td>@product.Id</td>
+                            <td>@product.Name</td>
+                            <td>@product.ProductType.TypeName</td>
+                            <td>@stock.TotalQuantity</td>
+                            <td>@stock.QuantityAvailable</td>
+                            <td>@product.QuantityUnit</td>
+                            <td>@stock.CostPrice</td>
+                            <td>@stock.SalePrice</td>
+                        </tr>
+                    }           }
+            }
+        </tbody>
+    </table>
+
+}
+else
+{
+    <p>No matching items found.</p>
+}
+@* </div> *@
+
+@code {
+    private List<Product>? products;
+    private List<ProductType>? prodType;
+    private List<ProductType>? filteredProdType;
+    private List<Product>? filteredProducts { get; set; }
+    private string query;
+    private int id;
+    private User user;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var userName = await CookieUtility.GetUserFromCookieAsync(httpContextAccessor);
+        var user = await userService.GetUserByUsernameAsync(userName); id = user.TenantID;
+        prodType = await ProdtypeService.GetAllProductTypesAsync(user.TenantID);
+        products = await productService.GetActiveProductsByTenantIdAsync(user.TenantID);
+        // Fetch stock information for all products in a single query
+        var productIds = products.Select(p => p.Id).ToList();
+        var stockList = await stockService.GetStocksByProductIdsAsync(productIds, user.TenantID);
+
+
+        foreach (var product in products)
+        {
+            product.Stocks = stockList.Where(s => s.ProductId == product.Id).ToList();
+        }
+        filteredProducts = products;
+
+
+    }
+
+    private async Task FilterProducts(ChangeEventArgs e)
+    {
+        query = e.Value.ToString();
+        if (string.IsNullOrWhiteSpace(query))
+        {
+
+            filteredProducts = products;
+        }
+        else
+        {
+
+            filteredProducts = products.Where(p =>
+            p.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+            p.Id.ToString().Contains(query, StringComparison.OrdinalIgnoreCase) ||
+              p.ProductType.TypeName.Contains(query, StringComparison.OrdinalIgnoreCase)).ToList();
+
+        }
+
+        StateHasChanged();
+
+    }
+
+    private void EditProduct(int productId)
+    {
+        NavigationManager.NavigateTo($"/products/{productId}/edit");
+    }
+
+    private async Task InActive(Product product)
+    {
+        try
+        {
+            // Invoke the service method to delete the product
+            var result = await productService.DeleteProductAsync(product, user);
+            if (result == true)
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "Stock Removed successfully!");
+                products = await productService.GetActiveProductsByTenantIdAsync(id);
+
+                var productIds = products.Select(p => p.Id).ToList();
+                var stockList = await stockService.GetStocksByProductIdsAsync(productIds, user.TenantID);
+
+
+                foreach (var prod in products)
+                {
+                    prod.Stocks = stockList.Where(s => s.ProductId == prod.Id).ToList();
+                }
+
+                filteredProducts = products;
+            }
+        }
+        catch (Exception ex)
+        {
+            // Handle any errors or exceptions
+            await JSRuntime.InvokeVoidAsync("alert", "Something Wrong!");
+
+        }
+    }
+
+    private void inActiveProducts()
+    {
+        NavigationManager.NavigateTo("/inactive_products");
+    }
+
+    public void ProductNavigate(int productId)
+    {
+        NavigationManager.NavigateTo($"/product/{productId}");
+    }
+
+
+}
+

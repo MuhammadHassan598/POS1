@@ -1,0 +1,284 @@
+﻿@page "/returnsale/{SaleID}"
+@inject POS1.Services.SaleServices saleService
+@inject NavigationManager NavigationManager
+@using POS1.Data
+@rendermode InteractiveServer
+@inject IJSRuntime JSRuntime
+
+<h1 class="heading-1">Sale Details</h1>
+
+@if (sale != null)
+{
+
+    <div class="heading-2">
+
+        <div class="flex-style">
+            <div><strong>Sale ID:</strong> @sale.SaleID</div>
+            <div><strong>Sale Date:</strong> @saleService.FormatSaleDateTime(sale.SaleDateTime)</div>
+        </div>
+
+
+        <div class="flex-style">
+            <div><strong>Total Amount:</strong> @saleService.FormatPrice(sale.TotalAmount)</div>
+            <div><strong>Discount:</strong> @saleService.FormatPrice(sale.Discount)</div>
+        </div>
+
+    </div>
+    @if (sale.SaleItems != null && sale.SaleItems.Any())
+    {
+
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Product ID</th>
+                    <th>Product Name</th>
+                    <th>Quantity</th>
+                    <th>Quantity Unit</th>
+                    <th>Unit Price</th>
+                    <th>Total Price</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in sale.SaleItems)
+                {
+                    <tr @onclick="() => Select(item)">
+                        <td>@item.ProductID</td>
+                        <td>@item.Product.Name</td>
+                        <td>@item.Quantity</td>
+                        <td>@item.QuantityUnit</td>
+                        <td>@saleService.FormatPrice(item.UnitPrice)</td>
+                        <td>@saleService.FormatPrice(item.TotalPrice)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+
+        @if (editableSaleItems != null && editableSaleItems.Any())
+        {
+            <h3>Selected Items for Return</h3>
+            <div class="selected-items-container">
+                <table class="table  table-hover">
+                    <thead>
+                        <tr>
+                            <th>Product ID</th>
+                            <th>Product Name</th>
+                            <th>Quantity</th>
+                            <th>Quantity Unit</th>
+                            <th>Unit Price</th>
+                            <th>Total Price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in editableSaleItems)
+                        {
+                           <tr>
+                               <td>@item.ProductID</td>
+                               <td>@item.ProductName</td>
+                               <td>
+                                    <input
+                                
+                                class="quantityInput"
+                                 min="0.01" step="0.01"
+                                type="number"
+                                           @bind:event="oninput"
+                                           @bind:get="item.Quantity"
+                                           max="@(item.MaxQuantity)"
+                                           @bind:set="(value) => UpdateQuantity(value, item)" />
+
+
+                                </td>
+                                <td> @item.QuantityUnit</td>
+
+                                <td>@saleService.FormatPrice(item.UnitPrice)</td>
+                                <td>
+                                    <input class="totalPriceInput"
+                                           type="number"
+                                           min="0.01"
+                                           step="0.01"
+                                           @bind:event="oninput"
+                                          @bind:get="item.TotalPrice"
+                                           max="@GetMaxValue(item.MaxQuantity, item.UnitPrice)"
+                                           @bind:set="(value) => UpdateTotalPrice(value, item)" />
+
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="heading-3"><strong>Total Amount for Return:</strong> @saleService.FormatPrice(totalAmount)</div>
+            <button class="btn btn-primary" @onclick="ReturnProducts">Confirm Return</button>
+
+        }
+        else
+        {
+            <p class="pAlert"><strong> Alert: No Item Is Selected</strong></p>
+        }
+    }
+    else
+    {
+        <p>No sale items found.</p>
+    }
+
+  @code {
+    [Parameter]
+    public string SaleID { get; set; }
+    private List<EditableSaleItemViewModel> editableSaleItems;
+    private Sale sale;
+    private List<SaleItem> returnItems = new List<SaleItem>();
+    public double totalAmount=0.00;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (int.TryParse(SaleID, out int saleId))
+        {
+            var userName = await CookieUtility.GetUserFromCookieAsync(httpContextAccessor);
+            var user = await userService.GetUserByUsernameAsync(userName);
+
+            sale = await saleService.GetSaleByIdAsync(saleId,user.TenantID);
+            editableSaleItems = new List<EditableSaleItemViewModel>();
+
+        }
+    }
+
+    public async Task<double> Quan(SaleItem item)
+    {
+        double maxQuantity = 0.00;
+        foreach (var itm in sale.SaleItems)
+        {
+            if (item.ProductID == itm.ProductID && item.StockId==itm.StockId)
+            {
+                maxQuantity += itm.Quantity;
+            }
+        }
+
+        return maxQuantity;
+    }
+
+    private async Task ReturnProducts()
+    {
+        var userName = await CookieUtility.GetUserFromCookieAsync(httpContextAccessor);
+        var user = await userService.GetUserByUsernameAsync(userName);
+        if (sale != null && editableSaleItems != null)
+        {
+
+            var returnItems = ConvertToSaleItemList(editableSaleItems);
+
+            List<SaleItem> saleItemsList = sale.SaleItems.ToList();
+            bool success = await saleService.ProcessSaleReturnAsync(returnItems,  user,sale.SaleID,totalAmount);
+
+
+            if (success)
+            {
+
+                NavigationManager.NavigateTo($"/sale/{SaleID}");
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "Failed to process return. Please try again.");
+            }
+        }
+    }
+
+    private async void Select(SaleItem item)
+    {
+        var existingItem = editableSaleItems.FirstOrDefault(i => i.ProductID == item.Product.Id);
+        double maxQuantity = await Quan(item);
+        if ((item.Quantity > 0.00) )
+        {
+            if (existingItem == null)
+            {
+                editableSaleItems.Add(new EditableSaleItemViewModel
+                    {
+                        ProductID = item.Product.Id,
+                        ProductName = item.Product.Name,
+                        StockId=item.StockId,
+                        Quantity = 0.00,
+                        QuantityUnit = item.QuantityUnit,
+                        UnitPrice = item.UnitPrice,
+                        TotalPrice = 0,
+                        MaxQuantity = maxQuantity
+                    });
+            }
+            else
+            {
+                editableSaleItems.Remove(existingItem);
+
+            }
+        }
+
+    }
+
+    private double GetMaxValue(double quantityAvailable, double unitPrice)
+    {
+        return Math.Round(quantityAvailable * unitPrice, 2);
+    }
+
+    private void UpdateQuantity(double quantity, EditableSaleItemViewModel item)
+    {
+
+        item.Quantity = Math.Clamp(quantity, 0, item.MaxQuantity);
+
+        item.TotalPrice = Math.Round(item.Quantity * item.UnitPrice, 2);
+
+        totalAmount = Math.Round(editableSaleItems.Sum(i => i.TotalPrice), 2); 
+        StateHasChanged();
+
+    }
+
+    private void UpdateTotalPrice(double value,EditableSaleItemViewModel item )
+    {
+        double maxValue = Math.Round(item.MaxQuantity * item.UnitPrice);
+        item.TotalPrice= Math.Clamp(value, 0, maxValue);
+        item.Quantity = Math.Round(item.TotalPrice / item.UnitPrice, 2);
+        totalAmount = Math.Round(editableSaleItems.Sum(item => item.TotalPrice), 2);
+    }
+ 
+ 
+    private List<SaleItem> ConvertToSaleItemList(List<EditableSaleItemViewModel> editableItems)
+    {
+        return editableItems.Select(item => new SaleItem
+            {
+                ProductID = item.ProductID,
+              StockId=item.StockId,
+                  QuantityUnit=item.QuantityUnit,
+                Quantity = item.Quantity,
+                UnitPrice = item.UnitPrice,
+                TotalPrice = item.TotalPrice
+            }).ToList();
+    }
+
+    public class EditableSaleItemViewModel
+    {
+        public int ProductID { get; set; }
+        public string ProductName { get; set; }
+        public string QuantityUnit { get; set; }
+        public double Quantity { get; set; }
+        public double UnitPrice { get; set; }
+        public double TotalPrice { get; set; } 
+        public int StockId { get; set; }
+        public double MaxQuantity { get; set; }
+    }
+}
+
+}
+
+
+
+
+<style>
+  
+    .pAlert {
+        color: red;
+        font-size: 16px;
+    }
+    .selected-items-container {
+        margin-top: 20px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 10px;
+    }
+
+</style>

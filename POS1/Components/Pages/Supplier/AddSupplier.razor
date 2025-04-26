@@ -1,0 +1,100 @@
+﻿@page "/addsupplier"
+@using POS1.Data
+@rendermode InteractiveServer
+@inject IJSRuntime JSRuntime
+@using POS1.Utilities
+@inject IJSRuntime JSRuntime
+@inject POS1.Services.ProductServices productService
+@using System.Collections.Generic;
+@using Microsoft.EntityFrameworkCore;
+@using System.Diagnostics
+@inject POS1.Services.UserServices userService
+@inject IHttpContextAccessor httpContextAccessor
+@inject POS1.Services.ProductTypeServices productTypeService
+@inject ApplicationDbContext dbContext
+@inject NavigationManager NavigationManager
+
+
+
+<h3 class="heading-1">Add Supplier</h3>
+
+<POS1.Components.Pages.AlertComponent SuccessMessage="@SuccessMessage" ErrorMessage="@ErrorMessage" />
+<EditForm Model="@supplier">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="form">
+
+
+        <div class="form-group ">
+            <label class="form-label-style" for="Name">Company Name : <span class="required">*</span></label>
+            <InputText id="Name" class=" form-control form-input-style" @bind-Value="supplier.Name" placeholder="Enter supplier company name" required />
+        </div>
+        <div class="form-group ">
+            <label class="form-label-style" for="Address">Supplier Address: <span class="required">*</span></label>
+            <InputText id="Address" class="form-input-style form-control" @bind-Value="supplier.Address" placeholder="Enter supplier's address'" required />
+        </div>
+        <div class="form-group ">
+            <label class="form-label-style" for="ContactAgent">Supplier Agent: <span class="required">*</span></label>
+            <InputText id="ContactAgent" class="form-input-style form-control" @bind-Value="supplier.ContactAgent" placeholder="Enter supplier agent name" required />
+        </div>
+        <div class="form-group ">
+            <label class="form-label-style" for="Phone">Supplier Phone: <span class="required">*</span></label>
+            <input type="tel" id="Phone" class="form-input-style form-control" @bind-value="supplier.Phone" maxlength="11" placeholder="Enter phone number" pattern="03\d{9}|0\d{9}" required />
+        </div>
+        <div class="form-group ">
+            <label class="form-label-style" for="Email">Email:</label>
+            <InputText type="email" id="Email" class="form-input-style form-control"
+                       placeholder="abc@gmail.com" @bind-Value="supplier.Email" required />
+        </div>
+
+        <button type="submit" class="btn btn-primary form-btn" @onclick="addSupplier">Add Supplier</button>
+    </div>
+</EditForm>
+
+
+@code {
+
+    public POS1.Data.Supplier supplier { get; set; } = new();
+     
+    public string SuccessMessage { get; set; }
+   public string ErrorMessage { get; set; }
+
+    public async Task addSupplier()
+    {
+        
+
+        if (string.IsNullOrEmpty(supplier.Name) || string.IsNullOrEmpty(supplier.ContactAgent) ||
+      string.IsNullOrEmpty(supplier.Address) || string.IsNullOrEmpty(supplier.Phone))
+        {
+            SuccessMessage = null;
+            ErrorMessage = "Please fill out all required fields.";
+            return;
+
+        }
+
+      try{ // newUser.RoleIs = UserRole.Supplier;
+        var userName = await CookieUtility.GetUserFromCookieAsync(httpContextAccessor);
+        var userData = await userService.GetUserByUsernameAsync(userName);
+        supplier.TenantId = userData.TenantID;
+        var result = await supplierService.AddSupplier(supplier);
+        if (result)
+        {
+            // Redirect
+            NavigationManager.NavigateTo("/updatestock");
+        }
+        else
+        {
+            ErrorMessage = "Something went wrong while adding the supplier.";
+            SuccessMessage = string.Empty;
+        }
+    }
+    catch (Exception ex)
+    {
+     ErrorMessage = $"Error: {ex.Message}";
+    SuccessMessage = null;
+    }
+}
+
+
+}

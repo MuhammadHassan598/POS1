@@ -1,0 +1,138 @@
+﻿@rendermode InteractiveServer
+
+<div class="modal-overlay">
+    <div class="overlay-card">
+        <div class="top-row-section">
+            <h3 class="heading-1">Payment</h3>
+            <button class="close-button" @onclick="CloseModal">X</button>
+        </div>
+
+
+        <POS1.Components.Pages.AlertComponent SuccessMessage="@SuccessMessage"                      ErrorMessage="@ErrorMessage" />
+        <div class="btn-div">
+            <button class="btn btn-outline-primary" @onclick="() =>payment.PaymentMethod = PaymentMethod.CashPayment">Via Cash</button>
+            <button class="btn btn-outline-primary" @onclick="() => payment.PaymentMethod = PaymentMethod.OnlinePayment">Via Online</button>
+            <button class="btn btn-outline-primary" @onclick="() => payment.PaymentMethod = PaymentMethod.CheckPayment">Via Cheque</button>
+
+        </div>
+
+
+        @if (payment.PaymentMethod == PaymentMethod.CashPayment)
+        {
+            <div>
+                <h5 class="center-text">Cash Payment</h5>
+                <input type="text" placeholder="Enter paid Amount" class="card-input form-control" @bind="payment.AmountPaid" min="0" max="@sale.TotalAmount" required />
+                <input type="date" placeholder="Enter Date" class=" card-input form-control" @bind="payment.PaymentDate" required />
+
+            </div>
+        }
+        else if (payment.PaymentMethod == PaymentMethod.OnlinePayment)
+        {
+            <div>
+                <h5 class="center-text">Online Payment</h5>
+                <input type="text" placeholder="Transaction ID" class=" card-input form-control" @bind="payment.TransactionId" required />
+
+                <input type="text" placeholder="Enter Gateway i.e Jazzcash ,Bank " class=" card-input form-control" @bind="payment.PaymentGateway" required />
+
+                <input type="text" placeholder="Enter paid Amount" class="card-input form-control" @bind="payment.AmountPaid" min="0" max="@sale.TotalAmount  " required />
+
+                <input type="date" placeholder="Enter Date" class="card-input form-control" @bind="payment.PaymentDate" required />
+
+            </div>
+        }
+        else if (payment.PaymentMethod == PaymentMethod.CheckPayment)
+        {
+            <div>
+                <h5 class="center-text">Cheque Payment</h5>
+                <input type="text" placeholder="Bank Name" class="card-input form-control" @bind="payment.BankName" required />
+                <input type="text" placeholder="Bank Branch" class="card-input form-control" @bind="payment.BankBranch " required />
+                <input type="text" placeholder="Cheque Number" class="card-input form-control" @bind="payment.CheckNumber " required />
+                <input type="text" placeholder="Enter paid Amount" class="card-inputform-control" @bind="payment.AmountPaid" min="0" max="@sale.TotalAmount" required />
+
+                <input placeholder="Cheque Date" class="card-input form-control" type="date" @bind="payment.PaymentDate" required />
+
+
+            </div>
+        }
+
+
+
+        <button class="btn btn-primary center-btn" @onclick="()=>SubmitPayment(payment)">Submit Payment</button>
+
+        <div class="center-text">
+            <strong>Bill Due Amount:</strong>@remainingAmount
+        </div>
+    </div>
+</div>
+
+
+@code {
+    [Parameter]
+    public EventCallback CloseMethod { get; set; }
+    [Parameter]
+    public  Sale sale { get; set; }
+    [Parameter]
+    public double remainingAmount { get; set; }
+    public Payment payment { get; set; } = new Payment{};
+    public string SuccessMessage { get; set; }
+    public string ErrorMessage { get; set; }
+    protected override async Task OnInitializedAsync()
+    {
+        payment.TenantId = sale.TenantID;
+        payment.AmountPaid = remainingAmount;
+        payment.PaymentDate = DateTime.Now;
+        payment.SaleId = sale.SaleID;
+    }
+
+    private void SelectPaymentMethod(PaymentMethod method)
+    {
+        payment.PaymentMethod = method;
+    }
+
+
+    private async Task CloseModal()
+    {
+        await CloseMethod.InvokeAsync();
+    }
+
+    private async void SubmitPayment(Payment Payment)
+    {
+
+
+        payment.AmountPaid = Math.Round(payment.AmountPaid, 2);
+        try
+        {
+            if (Payment.AmountPaid > 0)
+            {
+                bool result = await salePaymentService.AddPaymentBySale(payment, sale);
+                if (result)
+                {
+
+                    SuccessMessage = "Payment submitted successfully!";
+                    ErrorMessage = null;
+                   await CloseModal();
+                }
+                else
+                {
+                    ErrorMessage = "Failed to submit payment. Please try again.";
+                    SuccessMessage = null;
+                }
+
+                     }
+            else
+            {
+                ErrorMessage = "Amount should be greater than 0.";
+                SuccessMessage = null;
+            }
+         
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Error:{ex.Message}";
+            SuccessMessage = null;
+
+        }
+    }
+
+
+}

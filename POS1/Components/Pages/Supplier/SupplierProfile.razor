@@ -1,0 +1,155 @@
+﻿@page "/supplierprofile/{idString}"
+@rendermode InteractiveServer
+
+ 
+
+<div class="top-row-section">
+    <h2 class="heading-1">SupplierProfile</h2>
+    <div>
+        <button class=" btn btn-outline-primary btn-style" @onclick="ShowDataModal">
+            View supplier Data
+        </button>
+        <button class=" btn btn-outline-primary btn-style" @onclick="ShowPaymentModal">
+        Payment
+        </button>
+    </div>
+</div>
+@if (isDataVisible)
+{
+    <POS1.Components.Pages.Supplier.SupplierProfileData   CloseMethod="async () => CloseDataModal()" supplier="supplier" />
+}
+@if (isPaymentModalVisible)
+{
+    <POS1.Components.Pages.Supplier.SupplierPaymentCompo CloseMethod="async () => ClosePaymentModal()" supplierAccount="supplierAccount" />
+}
+
+
+ 
+<div class="search">
+    <input type="text" name="supplierBills" value="@query"
+           placeholder="Search Bill"
+           class="search-input-style form-control" @oninput="FilterSuppliersBills" />
+</div>
+
+
+@if (SupplierBills != null && SupplierBills.Any())
+{
+    <div class="supplier-bills">
+           <table class="table">
+            <thead>
+                <tr>
+                    <th>Bill ID</th>
+                    <th>Bill Date</th>
+                    <th>Bill Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var supplierBill in SupplierBills)
+                {
+                    <tr @onclick="() => supplierById(supplierBill.Id)">
+                        <td>@supplierBill.Id</td>
+                        <td>@saleService.FormatSaleDateTime(supplierBill.OrderDate)</td>
+                        <td>@saleService.FormatPrice(supplierBill.TotalAmount)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+
+    </div>
+}
+else
+{
+    <h3>No bill found!</h3>
+}
+
+
+
+
+@if (supplierAccount != null)
+{
+    <div class="account">
+        <div class="amount-owed"> <strong>Total Amount: </strong>@saleService.FormatPrice(@supplierAccount.TotalAmountOwed)</div>
+        <div><strong>Amount Paid: </strong>@saleService.FormatPrice(@supplierAccount.TotalAmountPaid)</div>
+        <div><strong>Remaining Amount: </strong>@saleService.FormatPrice(@supplierAccount.RemainingAmount)</div>
+
+    </div>
+
+}
+
+@code {
+    [Parameter]
+    public string idString { get; set; }
+    private int id;
+    public Supplier supplier = new();
+    public SupplierAccount supplierAccount;
+    public List<SuppliersBill> SupplierBills { get; set; }
+    public List<SuppliersBill> SearchBills { get; set; }
+    public string query;
+    private bool isPaymentModalVisible = false;
+    private bool isDataVisible = false;
+ 
+    protected override async Task OnParametersSetAsync()
+    {
+        if (int.TryParse(idString, out id))
+        {
+            supplier = await supplierService.GetSupplierByIdAsync(id);
+            supplierAccount = await supplierAccountService.GetSupplierAccountByIdAsync(supplier.Id, supplier.TenantId);
+            SupplierBills = (await supplierBillsService.GetSupplierBillsBySupplierId(supplier.Id, supplier.TenantId))
+                     .OrderByDescending(b => b.Id).ToList();
+            SearchBills = SupplierBills;
+        }
+
+    }
+
+    public void FilterSuppliersBills(ChangeEventArgs e)
+    {
+        query = e.Value.ToString();
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            SupplierBills = SearchBills;
+        }
+        else
+        {
+            SupplierBills = SearchBills.Where(s =>
+                 s.Id.ToString().Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                 s.OrderDate.ToString("d").Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                 s.TotalAmount.ToString().Contains(query, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+    }
+
+    public void supplierById(int id)
+    {
+        NavigationManager.NavigateTo($"/suppliersbill/{id}");
+
+    }
+
+    private void ShowPaymentModal()
+    {
+        isPaymentModalVisible = true;
+    }
+
+    private async Task ClosePaymentModal()
+    {
+        isPaymentModalVisible = false;
+        supplierAccount = await supplierAccountService.GetSupplierAccountByIdAsync(supplier.Id, supplier.TenantId);
+        SupplierBills = (await supplierBillsService.GetSupplierBillsBySupplierId(supplier.Id, supplier.TenantId))
+                     .OrderByDescending(b => b.Id).ToList();
+
+        StateHasChanged();
+
+    }
+
+    private void ShowDataModal()
+    {
+        isDataVisible = true;
+    }
+
+    private async Task CloseDataModal()
+    {
+        isDataVisible = false;
+        StateHasChanged();
+    }
+
+}
+

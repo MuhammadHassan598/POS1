@@ -1,0 +1,289 @@
+﻿@page "/suppliersbill/return/{id}"
+@inject NavigationManager navigationManager
+@rendermode InteractiveServer
+
+<style>
+    .supplier-bill{
+        border-bottom: 2px solid #c5c5c5;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+    }
+</style>
+
+<div class="top-row-section">
+    <h3 class="heading-1">SupplierBillReturn</h3>
+    <button class="btn btn-outline-primary btn-style"
+            @onclick="navigateToBill">
+        Back To SupplierBill
+    </button>
+</div>
+@if (supplierBill != null)
+
+{
+    <div class="supplier-bill">
+        <div class="flex-style">
+            <div> <strong>Bill Id: </strong> @supplierBill.Id</div>
+            <div> <strong> Bill Date:</strong>@saleService.FormatSaleDateTime(@supplierBill.OrderDate)</div>
+        </div>
+        <div class="flex-style">
+            <div> <strong>Tenant Id: </strong> @supplierBill.TenantID</div>
+            <div> <strong> Total Amount: </strong> @saleService.FormatPrice(@supplierBill.TotalAmount)</div>
+        </div>
+
+        <table class="table">
+            <thead>
+                <tr>
+                    <td>Bill_Item Id</td>
+                    <td> Product Name</td>
+                    <td>Quantity</td>
+                    <td>Quntity Unit</td>
+                    <td>Price</td>
+                    <td>Total Price</td>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in supplierBill.SupplierItems)
+                {
+                    <tr @onclick="() => Select(item)">
+                        <td>@item.Id</td>
+                        <td>@item.Product.Name</td>
+                        <td>@item.QuantityReceived</td>
+                        <td>@item.Product.QuantityUnit</td>
+                        <td>@saleService.FormatPrice(@item.UnitPrice)</td>
+                        <td>@saleService.FormatPrice(@item.TotalPrice)</td>
+                    </tr>
+
+                }
+
+            </tbody>
+
+        </table>
+
+  
+
+    </div>
+ }
+
+
+    @if (editableSupplierItem != null && editableSupplierItem.Any())
+    {
+        <h3 class="heading-2">Selected Items for Return</h3>
+
+    <table class="table  table-hover">
+                <thead>
+                    <tr>
+                        <td>Bill_Item Id</td>
+                        <td> Product Name</td>
+                        <td>Quantity</td>
+                        <td>Quntity Unit</td>
+                        <td>Price</td>
+                        <td>Total Price</td>
+                        <td>Remove</td>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in editableSupplierItem)
+                    {
+                        <tr >
+                            <td>@item.Id</td>
+                            <td>@item.ProductName</td>
+                            <td>
+                                <input min="0.01" 
+                     type="number" step="0.01" max="@item.MaxQuantity" @bind:get="@item.QuantityReceived" @bind:event="oninput" @bind:set="(value) => UpdateQuantity(value,item)" />
+
+                            </td>
+                            <td> @item.QuantityUnit</td>
+
+                            <td>@saleService.FormatPrice(item.UnitPrice)</td>
+                            <td>
+                                <input 
+                                       type="number"
+                                       min="0.01"
+                                       step="0.01"
+                                       @bind:get="@item.TotalPrice"
+                                       max="@GetMaxValue(item.MaxQuantity, item.UnitPrice)"
+                                      @bind:event="oninput"
+                                       @bind:set="(value) => UpdateTotalPrice(value,item)" />
+
+                            </td>
+
+                             <td>
+                                <button class="btn btn-danger btn-style" @onclick="() => remove(item)">
+                                     remove
+                                 </button>
+
+                              </td>
+
+                        </tr>
+                    }
+                </tbody>
+            </table>
+   
+
+        <div class="heading-3"><strong>Total Amount for Return:</strong> @saleService.FormatPrice(totalAmount)</div>
+        <button class="btn btn-primary btn-style" @onclick="ReturnProducts">Confirm Return</button>
+ 
+
+
+    @code {
+    [Parameter]
+    public string id { get; set; }
+    public double maxQuant { get; set; }
+    public double totalAmount { get; set; }
+    private SuppliersBill supplierBill;
+
+    private List<EditableSupplierItemViewModel> editableSupplierItem = new List<EditableSupplierItemViewModel>();  
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrEmpty(id))
+        {
+
+            if (int.TryParse(id, out int Id))
+            {
+                var userName = await CookieUtility.GetUserFromCookieAsync(httpContextAccessor);
+                var user = await userService.GetUserByUsernameAsync(userName);
+
+
+                supplierBill = await supplierBillsService.GeSupplierBillByIdAsync(Id,user.TenantID);
+
+            }
+        }
+    }
+
+    public async Task<double> GetMaxAvailableQuan(SupplierItem item)
+    {
+        maxQuant  = 0.00;
+        foreach (var itm in supplierBill.SupplierItems)
+        {
+            if (item.ProductId == itm.ProductId)
+            {
+                maxQuant += itm.QuantityReceived;
+            }
+        }
+
+        return maxQuant;
+
+    }
+
+    private async void Select(SupplierItem item)
+    {
+        var existingItem = editableSupplierItem.FirstOrDefault(i => i.Id == item.Id);
+
+        //check negative quantity product and maximum quantitity
+        if (item.QuantityReceived > 0)
+        {
+            if (existingItem == null)
+            {
+                double maxQuantity = await GetMaxAvailableQuan(item);
+                editableSupplierItem.Add(new EditableSupplierItemViewModel
+                { 
+
+                        Id= item.Id,
+                   SuppliersBillID = item.SuppliersBillID,
+                        ProductId=item.ProductId, 
+                        ProductName=item.Product.Name,
+                        QuantityUnit=item.Product.QuantityUnit.ToString(),
+                         QuantityReceived = maxQuantity,
+                         MaxQuantity = maxQuantity,
+                        UnitPrice = item.UnitPrice,
+                         TotalPrice = Math.Round(maxQuantity * item.UnitPrice,2),
+                        TenantID = item.TenantID,
+
+                    });
+                totalAmount = Math.Round(maxQuantity * item.UnitPrice, 2);
+            }
+            else
+            {
+                editableSupplierItem.Remove(existingItem);
+
+            }
+        }
+
+    }
+
+    private void UpdateQuantity(double value,EditableSupplierItemViewModel item)
+    {
+        item.QuantityReceived = Math.Clamp(value, 0, item.MaxQuantity);     
+        item.TotalPrice = Math.Round(item.QuantityReceived * item.UnitPrice, 2);
+        totalAmount= editableSupplierItem.Sum(item => item.TotalPrice);        
+    }
+
+    private double GetMaxValue(double quantityAvailable, double unitPrice)
+    {
+        return Math.Round(quantityAvailable * unitPrice, 2);
+    }
+
+    private void UpdateTotalPrice(double value,EditableSupplierItemViewModel item )
+    {
+          double maxPrice = GetMaxValue(item.MaxQuantity, item.UnitPrice);
+          item.TotalPrice = Math.Clamp(value, 0, maxPrice);
+          item.QuantityReceived = Math.Round(item.TotalPrice / item.UnitPrice, 2);
+          totalAmount = editableSupplierItem.Sum(item => item.TotalPrice);
+          StateHasChanged();
+    }
+
+
+    private List<SupplierItem> ConvertToSupplierItemList(List<EditableSupplierItemViewModel> editableItems)
+    {
+        return editableItems.Select(item => new SupplierItem
+            {SuppliersBillID=supplierBill.Id,
+                ProductId = item.ProductId,
+                QuantityReceived = item.QuantityReceived,
+                UnitPrice = item.UnitPrice,
+                TotalPrice = item.TotalPrice,
+                TenantID=item.TenantID,
+            }).ToList();
+    }
+    public void remove(EditableSupplierItemViewModel item)
+    {
+        editableSupplierItem.Remove(item);
+        StateHasChanged();  
+    }
+
+    private async Task ReturnProducts()
+    {
+        var userName = await CookieUtility.GetUserFromCookieAsync(httpContextAccessor);
+        var user = await userService.GetUserByUsernameAsync(userName);
+        if (supplierBill != null && editableSupplierItem != null)
+        {
+
+            var returnItems = ConvertToSupplierItemList(editableSupplierItem);
+
+             
+            
+
+            bool success = await supplierBillsService.ReturnSupplierBill(returnItems,supplierBill,user,totalAmount);
+
+             if (success)
+             {
+
+                navigationManager.NavigateTo($"/suppliersbill/{supplierBill.Id}");
+            }
+             else
+            {
+                  }
+        }
+    }
+
+    public void navigateToBill()
+    {
+        navigationManager.NavigateTo($"/suppliersbill/{supplierBill.Id}");
+    }
+
+    public class EditableSupplierItemViewModel
+    {
+        public int Id { get; set; }
+        public int SuppliersBillID { get; set; }
+        public int ProductId { get; set; }
+        public String ProductName { get; set; }
+        public double QuantityReceived { get; set; }
+        public String QuantityUnit { get; set; }
+        public double MaxQuantity { get; set; }
+        public double UnitPrice { get; set; }
+        public double TotalPrice { get; set; }
+        public int TenantID { get; set; }
+    }
+}
+
+}

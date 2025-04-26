@@ -1,0 +1,49 @@
+﻿
+<div class="modal-overlay">
+    <div class="overlay-card">
+        <div class="top-row-section">
+            <h3 class="heading-1">Customer Profile</h3>
+            <button class="close-button" @onclick="CloseModal">X</button>
+        </div>
+
+        @if (supplier != null)
+        {
+            <div class="card-data">
+                <div>
+                    <strong>Id:</strong>
+                    <div>@supplier.Id</div>
+                </div>  <div>
+                        <strong>Name:</strong>
+                        <div>@supplier.Name</div>
+                    </div>
+                    <div>
+                        <strong>Address:</strong>
+                        <div>@supplier.Address</div>
+                    </div>
+                    <div>
+                      <strong>Contact Agent:</strong>
+                      <div>@supplier.ContactAgent</div>
+                    </div>
+                    <div>
+                        <strong>Phone no:</strong>
+                        <div>@supplier.Phone</div>
+                    </div>
+                    <div>
+                       <strong>Email:</strong>
+                       <div>@supplier.Email</div>
+                    </div>  
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback CloseMethod { get; set; }
+    [Parameter]
+    public Supplier supplier { get; set; }
+    private async Task CloseModal()
+    {
+        await CloseMethod.InvokeAsync();
+    }
+}

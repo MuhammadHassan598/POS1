@@ -1,0 +1,54 @@
+﻿@page "/product/{ID}/history"
+@rendermode InteractiveServer
+<h3>ProductHistory</h3>
+
+
+@if (inventoryLog!=null &&  inventoryLog.Any())
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Product_ID</th>
+                <th>Name</th>
+                <th>ActionIs</th>
+                <th>Quantity Changed</th>
+                <th>DateTime</th>
+                <th>UserId</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var log in inventoryLog)
+            {
+                
+                        <tr  >
+                    <td>@log.ProductId</td>
+                    <td>@log.Product.Name</td>
+                    <td>@log.ActionIs</td>
+                    <td>@log.QuantityChanged</td>
+                    <td>@saleService.FormatSaleDateTime(@log.LogDateTime)</td>
+                    <td>@log.UserId</td>
+                        </tr>
+              
+            }
+        </tbody>
+    </table>
+
+
+}
+
+@code {
+    [Parameter]
+    public string ID { get; set; }
+    private User user;
+    private List<InventoryLog> inventoryLog;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (int.TryParse(ID, out int Id))
+        {
+            var userName = await CookieUtility.GetUserFromCookieAsync(httpContextAccessor);
+            user = await userService.GetUserByUsernameAsync(userName);
+            inventoryLog = await logService.GetAllInventoryLogsAsync(Id, user.TenantID);
+        }
+    }
+}

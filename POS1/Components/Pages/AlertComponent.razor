@@ -1,0 +1,20 @@
+﻿
+
+@if (!string.IsNullOrEmpty(SuccessMessage))
+{
+    <RadzenAlert AlertStyle="AlertStyle.Success" Variant="Variant.Flat" Shade="Shade.Lighter" Closeable="true"
+                 Style="font-size: 16px; font-weight: 500;">
+        @SuccessMessage
+    </RadzenAlert>
+}
+else if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <RadzenAlert AlertStyle="AlertStyle.Danger" Variant="Variant.Flat" Shade="Shade.Lighter" Closeable="true"
+                 Style="font-size: 16px; font-weight: 500;">
+        @ErrorMessage
+    </RadzenAlert>
+}
+@code {
+    [Parameter] public string SuccessMessage { get; set; }
+    [Parameter] public string ErrorMessage { get; set; }
+}

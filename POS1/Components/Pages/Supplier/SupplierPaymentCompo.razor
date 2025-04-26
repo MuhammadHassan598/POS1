@@ -1,0 +1,148 @@
+﻿@rendermode InteractiveServer
+@using POS1.Data
+
+ 
+<div class="modal-overlay">
+    <div class="overlay-card">
+       
+        <div class="top-row-section">
+        <h4>Payment Details</h4>
+        <button class="close-button" @onclick="CloseModal">X</button>
+        </div>
+       
+        @if (!string.IsNullOrEmpty(SuccessMessage))
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Success" Variant="Variant.Flat" Shade="Shade.Lighter" Closeable="true"
+                         Style="font-size: 16px; font-weight: 500;">
+                @SuccessMessage
+            </RadzenAlert>
+        }
+        else if (!string.IsNullOrEmpty(ErrorMessage))
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Danger" Variant="Variant.Flat" Shade="Shade.Lighter" Closeable="true"
+                         Style="font-size: 16px; font-weight: 500;">
+                @ErrorMessage
+            </RadzenAlert>
+        }
+
+        <div class="btn-div">
+            <button class="btn btn-outline-primary" @onclick="() => supplierPayment.PaymentMethod = PaymentMethods.CashPayment">Via Cash</button>
+            <button class="btn btn-outline-primary " @onclick="() => supplierPayment.PaymentMethod = PaymentMethods.OnlinePayment">Via Online</button>
+            <button class="btn btn-outline-primary " @onclick="() => supplierPayment.PaymentMethod = PaymentMethods.CheckPayment">Via Cheque</button>
+
+        </div>
+
+
+        @if (supplierPayment.PaymentMethod == PaymentMethods.CashPayment)
+        {
+            <div>
+                <h5 class="center-text">Cash Payment</h5>
+                <input type="text" placeholder="Enter paid Amount" class="form-control card-input  " @bind="supplierPayment.AmountPaid" min="0" max="@supplierAccount.RemainingAmount" required />
+                <input type="date" placeholder="Enter Date" class="form-control card-input  " @bind="supplierPayment.PaymentDate" required />
+
+            </div>
+        }
+        else if (supplierPayment.PaymentMethod == PaymentMethods.OnlinePayment)
+        {
+            <div>
+                <h5 class="center-text">Online Payment</h5>
+                <input type="text" placeholder="Transaction ID" class="card-input  form-control" @bind="supplierPayment.TransactionId" required />
+
+                <input type="text" placeholder="Enter Gateway i.e Jazzcash ,Bank " class="card-input  form-control" @bind="supplierPayment.PaymentGateway" required />
+
+                <input type="text" placeholder="Enter paid Amount" class="card-input  form-control" @bind="supplierPayment.AmountPaid" min="0" max="@supplierAccount.RemainingAmount" required />
+
+                <input type="date" placeholder="Enter Date" class="card-input  form-control" @bind="supplierPayment.PaymentDate" required />
+
+            </div>
+        }
+        else if (supplierPayment.PaymentMethod == PaymentMethods.CheckPayment)
+        {
+            <div>
+                <h5 class="center-text">Cheque Payment</h5>
+              
+                <input type="text" placeholder="Bank Name" class="card-input form-control" @bind="supplierPayment.BankName" required />
+              
+                <input type="text" placeholder="Bank Branch" class="card-input  form-control" @bind="supplierPayment.BankBranch " required />
+               
+                <input type="text" placeholder="Cheque Number" class="card-input  form-control" @bind="supplierPayment.CheckNumber " required />
+              
+                <input type="text" placeholder="Enter paid Amount" class="card-input  form-control" @bind="supplierPayment.AmountPaid" min="0" max="@supplierAccount.RemainingAmount" required />
+
+                <input placeholder="Cheque Date" class="card-input  form-control" type="date" @bind="supplierPayment.PaymentDate" required />
+
+
+            </div>
+        }
+
+
+
+        <button class="btn btn-primary center-btn" @onclick="()=>SubmitPayment(supplierPayment)">Submit Payment</button>
+
+        <div class="center-text">
+            <strong>Bill Due Amount:</strong>@supplierAccount.RemainingAmount
+        </div>
+    </div>
+</div>
+
+@code {
+
+
+    [Parameter]
+    public EventCallback CloseMethod { get; set; }
+    [Parameter]
+    public SupplierAccount supplierAccount { get; set; }
+    public SupplierPayment supplierPayment { get; set; } = new SupplierPayment
+        {
+            PaymentDate = DateTime.Now,
+        };
+    public int id = 0;
+    public string SuccessMessage { get; set; }
+    public string ErrorMessage { get; set; }
+  
+   protected override async Task OnInitializedAsync()
+    {
+        supplierPayment.AmountPaid = supplierAccount.RemainingAmount;
+    }
+
+    private async Task CloseModal()
+    {
+        await CloseMethod.InvokeAsync();
+    }
+
+    private async void SubmitPayment(SupplierPayment supplierPayment)
+    {
+
+        id = supplierAccount.SupplierId;
+        supplierPayment.AmountPaid = Math.Round(supplierPayment.AmountPaid, 2);
+
+        if (supplierPayment.AmountPaid > 0)
+        {
+            bool result = await supplierPaymentService.AddPaymentAsync(supplierPayment, supplierAccount);
+            if (result)
+            {
+                SuccessMessage = "Payment submitted successfully!";
+                ErrorMessage = null;
+                await CloseModal();
+            }
+            else
+            {
+                ErrorMessage = "Failed to submit payment. Please try again.";
+                SuccessMessage = null;
+            }
+
+        }
+        else
+        {
+            ErrorMessage = "Amount should be greater than 0.";
+            SuccessMessage = null;
+        }
+        StateHasChanged();
+    }
+
+    private void SelectPaymentMethod(PaymentMethods method)
+    {
+        supplierPayment.PaymentMethod = method;
+    }
+
+}

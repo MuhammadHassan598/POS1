@@ -1,0 +1,87 @@
+﻿@page "/product/{ID}"
+@rendermode InteractiveServer
+
+<div class="top-row-section">
+    <h3 class="heading-1">Product Details</h3>
+    <div>
+        <button class="btn btn-outline-primary btn-style" @onclick="() => EditProduct(product.Id)"> Edit Product    </button>
+        <button class="btn btn-outline-primary btn-style" @onclick="() => InActive(product)"> Delete Product    </button>
+        <button class="btn btn-outline-primary btn-style" @onclick="ProductHistory"> Product History    </button>
+    </div>
+</div>
+@if (product != null)
+{
+    <div class="card">
+        <div><strong>Id: </strong> @product.Id</div>
+        <div><strong>Name: </strong> @product.Name</div>
+        <div><strong>Description: </strong>@product.Description</div>
+        <div><strong>QuantityUnit: </strong>@product.QuantityUnit</div>
+        <div><strong>Barcode: </strong>@product.Barcode</div>
+        <div><strong>Type: </strong>@product.ProductType.TypeName</div>
+        <div><strong>TenantId: </strong>@product.Id</div>
+        <div><strong></strong></div>
+    </div>
+}
+  
+@code {
+    [Parameter]
+    public string ID { get; set; }  
+    private User user;
+    private Product product;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (int.TryParse(ID, out int Id))
+        {
+            var userName = await CookieUtility.GetUserFromCookieAsync(httpContextAccessor); 
+            user = await userService.GetUserByUsernameAsync(userName);
+            product = await productService.GetProductByIdAsync(Id, user.TenantID);
+        }
+    }
+
+    private void EditProduct(int productId)
+    {
+        NavigationManager.NavigateTo($"/products/{productId}/edit");
+    }
+
+    private async Task InActive(Product product)
+    {
+        try
+        {
+             var result = await productService.DeleteProductAsync(product, user);
+            if (result == true)
+            {
+            
+               
+            }
+        }
+        catch (Exception ex)
+        { 
+        }
+    }
+
+   
+    
+    
+    public void ProductHistory()
+    {
+        NavigationManager.NavigateTo($"/product/{ID}/history"); 
+    }
+
+
+}
+
+<style>
+    .card{
+        background-color: #d3ddf5;
+        border-radius:15px;
+        width:max-content;
+        padding:10px;
+    }
+    .card div{
+       display:flex;
+       gap:10px;
+       font-size:18px;
+       margin:10px 10px;
+    }
+</style>

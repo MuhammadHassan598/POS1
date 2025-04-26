@@ -1,0 +1,134 @@
+﻿@page "/dashboard"
+@inject POS1.Services.ProductServices productService
+@inject NavigationManager navigationManager
+@rendermode InteractiveServer
+@inject IJSRuntime JSRuntime
+
+
+ @using System.Globalization
+
+
+ <style> 
+    .rz-chart svg {
+        overflow: visible;
+    } 
+     text.rz-tick-text{
+         text-wrap:wrap;
+         display:flex;
+         flex-wrap:wrap;
+     }
+
+    .dashbo{
+        margin:0 0 115px 0;
+    }
+
+    .rz-axis .rz-grid-line, .rz-axis {
+        stroke: #cbcdcf;
+    }
+
+   .rz-card.rz-variant-outlined {
+        background: #bee5f1;
+        
+    }
+
+  
+    
+ </style>
+ <div class="dashbo">
+<RadzenStack class="rz-p-0 rz-p-md-6 rz-p-lg-12">
+    <RadzenCard Variant="Variant.Outlined">
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+            <RadzenCheckBox @bind-Value="@showDataLabels" Name="dataLabels"></RadzenCheckBox>
+            <RadzenLabel Text="Show Data Labels" Component="dataLabels" />
+        </RadzenStack>
+    </RadzenCard>
+    <RadzenRow   RowGap="70">
+  
+
+        <RadzenColumn Size="12">
+            <h4>Sales Data for the Last 30 Days</h4>
+            <RadzenChart>
+                <RadzenColumnSeries Data="@revenueLast30Days" CategoryProperty="Day" Title="Last 30 Days" LineType="LineType.Dashed" ValueProperty="TotalAmount">
+                    <RadzenSeriesDataLabels Visible="@showDataLabels" />
+                </RadzenColumnSeries>
+                <RadzenLegend Visible="false" />
+                <RadzenColumnOptions Radius="5" Width="20" />
+        <RadzenCategoryAxis>
+    <RadzenTicks>
+       <Template>
+           <text class="rz-tick-text" style="font-size:16px;   text-anchor: start; transform: translate(@(context.X + 2)px, @(context.Y + 56)px) rotate(270deg)">@context.Value</text>
+       </Template>
+    </RadzenTicks>
+</RadzenCategoryAxis>
+                <RadzenValueAxis Formatter="@FormatAsPkr">
+                    <RadzenGridLines Visible="true" />
+                    <RadzenAxisTitle Text="Total Sales in Pkr" />
+                </RadzenValueAxis>
+            </RadzenChart>
+        </RadzenColumn>
+
+        <RadzenColumn Size="12">
+            <h4>Sales Data for the Last Year (Monthly)</h4>
+            <RadzenChart>
+                <RadzenColumnSeries Data="@revenueLast1Year" CategoryProperty="Month" Title="Last 12 Months" LineType="LineType.Dashed" ValueProperty="TotalAmount">
+                    <RadzenSeriesDataLabels Visible="@showDataLabels" />
+                </RadzenColumnSeries>
+                <RadzenLegend Visible="false" />
+                <RadzenColumnOptions Radius="5" Width="20" />
+                  <RadzenCategoryAxis> 
+                      <RadzenTicks>
+                    <Template>
+                        <text class="rz-tick-text" style="font-size:16px;    text-anchor: start; transform: translate(@(context.X + 2)px, @(context.Y + 74)px) rotate(270deg)">@context.Value</text>
+                    </Template>
+                </RadzenTicks>
+                </RadzenCategoryAxis  >
+                <RadzenValueAxis Formatter="@FormatAsPkr">
+                    <RadzenGridLines Visible="true" />
+                    <RadzenAxisTitle Text="Total Sales in PKR" />
+                </RadzenValueAxis>
+            </RadzenChart>
+        </RadzenColumn>
+
+    </RadzenRow>
+</RadzenStack>
+</div> 
+@code {
+    bool showDataLabels = false;
+    public List<Sale> sales;
+    public List<DataItem> revenueLast30Days;
+    public List<YearlyDataItem> revenueLast1Year;
+    public  class DataItem
+    {
+        public string Day { get; set; }   
+        public double TotalAmount { get; set; }
+    }
+    public class YearlyDataItem
+    {
+        public string Month { get; set; }
+        public double TotalAmount { get; set; }
+    }
+    string FormatAsPkr(object value)
+    {
+        return ((double)value).ToString("C0", CultureInfo.CreateSpecificCulture("ur-PK"));
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var userName = await CookieUtility.GetUserFromCookieAsync(httpContextAccessor);
+            var user = await userService.GetUserByUsernameAsync(userName);
+            var tenantId = user.TenantID;
+
+            revenueLast30Days = await saleService.GetAllSalesByTenantIdAsyncLast30Days(tenantId);
+            revenueLast1Year = await saleService.GetAllSalesByTenantIdAsyncLastYear(tenantId);
+        }
+        catch (Exception ex)
+        {
+            // Log the error to a logging service
+            Console.WriteLine($"Error during initialization: {ex.Message}");
+            throw;
+        }
+    }
+
+}

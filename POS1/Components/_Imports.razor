@@ -1,0 +1,41 @@
+﻿@using System.Net.Http
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Web
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@using Microsoft.JSInterop
+@using POS1
+@using POS1.Services
+@using POS1.Components
+@inject IHttpContextAccessor httpContextAccessor
+@inject POS1.Services.ProductServices productService
+@inject POS1.Services.UserServices userService
+@using POS1.Data
+@using POS1.Utilities
+@using System.Collections.Generic;
+@using Microsoft.EntityFrameworkCore;
+@using System.Diagnostics
+@inject ApplicationDbContext dbContext 
+@inject POS1.Services.SaleServices saleService
+@inject NavigationManager NavigationManager  
+@inject POS1.Services.ProductServices productService
+@inject POS1.Services.UserServices userService   
+@inject POS1.Services.InventoryLogServices logService
+@inject POS1.Services.StockServices stockService
+@inject POS1.Services.ProductTypeServices prodtypeService
+@inject POS1.Services.SupplierServices supplierService
+@inject POS1.Services.SupplierAccountServices supplierAccountService
+@inject POS1.Services.SupplierBillsServices supplierBillsService
+@inject POS1.Services.SupplierItemsServices supplierItemsService
+@inject POS1.Services.SupplierPaymentServices supplierPaymentService
+@inject POS1.Services.CustomerService customerService
+@inject POS1.Services.BillReferenceServices billReferenceService
+@inject POS1.Services.CustomerAccountService customerAccountService
+@inject POS1.Services.SalePaymentServices salePaymentService
+ 
+@using Radzen
+@using Radzen.Blazor
+
+ 

@@ -1,0 +1,262 @@
+﻿@page "/updatestock"
+@inject POS1.Services.ProductServices productService
+@inject NavigationManager navigationManager
+@rendermode InteractiveServer
+@inject IJSRuntime JSRuntime
+ 
+
+<div class="top-row-section">
+
+    <h3 class="heading-1">Update Stock </h3>
+ 
+<div class="newSupplier">
+        <button class="btn btn-outline-primary btn-style" onclick="@AddSupplier">Add Supplier</button>
+
+        </div>
+    </div>
+ 
+
+ 
+<RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.Start" Gap="0.5rem" Style="margin-bottom:15px;" class="">
+    <RadzenLabel Style="font-size:22px; font-weight:500; padding-right:8px;" Text="Select Supplier:" />
+    <RadzenDropDown 
+        Data="@filteredSuppliers"
+        TextProperty="Name"
+                    ValueProperty="Id"
+        Placeholder="Select Supplier"
+        AllowClear="true"
+        AllowFiltering="true"
+        @bind-Value="SelectedSupplier"
+        Style="width: 100%; max-width: 400px;
+        height:50px; font-size:22px "
+        Filter="OnFilter">
+    </RadzenDropDown>
+</RadzenStack> 
+
+
+  
+<POS1.Components.Pages.Inventory.SearchProduct FilteredProducts="@filteredProducts" OnProductSelected="HandleSaleSelected" ShouldPassStock="false" />
+
+<div >
+    @if (supplierItems != null && supplierItems.Any())
+    {
+        <div class="selected mt-5">
+            <table class="table  table-hover">
+                <thead>
+                    <tr>
+                        <th>Product ID</th>
+                        <th>Product Name</th>
+                        <th>Quantity</th>
+                        <th>Quantity Unit</th>
+                        <th>Price (Rs)</th>
+                        <th>Sale Price (Rs)</th>
+                        <th>Total Price (Rs)</th>
+                        <th>Remove</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var supplierItem in supplierItems)
+                    {
+                        <tr>
+                            <td>@supplierItem.ProductId</td>
+                            <td>@supplierItem.Product.Name</td>
+                            <td>
+                                <input type="number" min="0.01" step="0.01" value="@supplierItem.QuantityReceived" class="form-control" @oninput="e => UpdateTotalPriceByQuantity(supplierItem, e)" />
+                            </td>
+                           <td> 
+                               @supplierItem.Product.QuantityUnit
+                           </td>
+                            <td>
+                                <input type="number" min="0.01" value="@supplierItem.UnitPrice" class="form-control" step="0.01" required
+                                       @oninput="e => UpdateTotalPriceByUnitPrice(supplierItem, e)" />
+                            </td>
+                            <td>
+                                <input type="number" min="@supplierItem.UnitPrice"
+               class="form-control" step="0.01" required
+                                       @bind:get="supplierItem.Product.Stocks.FirstOrDefault().SalePrice"
+                                       @bind:event="oninput"
+                                 
+                                       @bind:set="(value) => UpdateSalePrice(value, supplierItem)"
+                                       @onblur="() => ValidateSalePrice(supplierItem)" />
+                                @if (supplierItem.Product.Stocks.FirstOrDefault().SalePrice < supplierItem.UnitPrice)
+                                {
+                                    <span class="text-danger">Sale price must be greater than or equal to unit price.</span>
+                                }
+                            </td>
+                            <td>
+                                      @supplierItem.TotalPrice.ToString("F2")
+                            </td>
+                            <td>
+                                <button class="btn btn-danger btn-style" @onclick="() => RemoveItem(supplierItem)">remove</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+
+            <div class="heading-3">
+                <strong>Total Amount: Rs @totalAmount.ToString("F2")</strong>
+            </div>
+
+            <button class="btn btn-primary btn-style" @onclick="UpdateStockAsync ">Update Stock</button>
+        </div>
+    }
+</div>
+
+
+@code {
+
+
+    private List<Product> filteredProducts;
+    private List<Product> updatedProducts = new List<Product>();
+    private List<Supplier> supplierUsers { get; set; }
+    private List<Supplier> filteredSuppliers = new List<Supplier>();
+    public List<SupplierItem> supplierItems = new List<SupplierItem>();
+    public List<Stock> stock = new List<Stock>();
+    private int? SelectedSupplier { get; set; }
+    private double totalAmount = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var userName = await CookieUtility.GetUserFromCookieAsync(httpContextAccessor);
+        var user = await userService.GetUserByUsernameAsync(userName);
+        if (user != null)
+        {
+            supplierUsers = await supplierService.GetAllSuppliersByTenentId(user.TenantID);
+            filteredSuppliers = supplierUsers;
+        }
+    } 
+
+    private async Task HandleSaleSelected(Product selectedProduct)
+    {
+        var existingSupplierItem = supplierItems.FirstOrDefault(p => p.ProductId == selectedProduct.Id);
+        if (existingSupplierItem == null)
+        {
+
+            var newSupplierItem = new SupplierItem
+                {
+                    ProductId = selectedProduct.Id,
+                    Product = selectedProduct,
+                    QuantityReceived = 0,
+                    UnitPrice=0, 
+                    TotalPrice=0,
+                    TenantID = selectedProduct.TenantId,
+                };
+            var newStock = new Stock
+                {
+                    ProductId = selectedProduct.Id,
+                   TotalQuantity= 0,
+                   CostPrice = 0,
+                    SalePrice = 0,
+                    QuantityAvailable=0,
+                    TenantId = selectedProduct.TenantId
+                };
+            newSupplierItem.Product.Stocks = null;
+            if (newSupplierItem.Product.Stocks == null)
+            {
+                newSupplierItem.Product.Stocks = new List<Stock>();
+            }
+            newSupplierItem.Product.Stocks.Add(newStock);
+            supplierItems.Add(newSupplierItem);
+
+        }
+        else
+
+        {
+            existingSupplierItem.QuantityReceived++;
+            existingSupplierItem.TotalPrice = existingSupplierItem.QuantityReceived * existingSupplierItem.UnitPrice;
+        }
+        StateHasChanged(); 
+    }
+
+
+    private void UpdateTotalPriceByUnitPrice(SupplierItem supplierItem, ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out var newValue))
+        {
+            supplierItem.UnitPrice = Math.Round(newValue, 2); // Round to 2 decimal places
+            supplierItem.TotalPrice = Math.Round(supplierItem.QuantityReceived * supplierItem.UnitPrice, 2); // Round to 2 decimal places
+            totalAmount = Math.Round(supplierItems.Sum(item => item.TotalPrice), 2);
+        }
+    }
+
+    private void UpdateTotalPriceByQuantity(SupplierItem supplierItem, ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out var newValue))
+        {
+
+            supplierItem.QuantityReceived = Math.Round(newValue,2);
+            supplierItem.TotalPrice = Math.Round(supplierItem.QuantityReceived * supplierItem.UnitPrice, 2); 
+            totalAmount = Math.Round(supplierItems.Sum(item => item.TotalPrice), 2);
+        }
+    }
+
+    private void ValidateSalePrice(SupplierItem supplierItem)
+    {
+        var stock = supplierItem.Product.Stocks.FirstOrDefault();
+        if (stock != null && stock.SalePrice < supplierItem.UnitPrice)
+        {
+            stock.SalePrice = supplierItem.UnitPrice; // Reset to unit price if invalid
+        }
+        StateHasChanged();
+    }
+    private void UpdateSalePrice(double value ,SupplierItem supplierItem )
+    {  
+        // if (value < supplierItem.UnitPrice)
+        // {
+        //     supplierItem.Product.Stocks.FirstOrDefault().SalePrice = supplierItem.UnitPrice;
+        // }
+        // else
+        // {
+        supplierItem.Product.Stocks.FirstOrDefault().SalePrice = Math.Round(value,2);
+        StateHasChanged();
+
+    }
+
+    private async Task UpdateStockAsync()
+    {
+        if (SelectedSupplier == null || SelectedSupplier <= 0)
+        {
+            throw new ArgumentException("Supplier must be selected.", nameof(SelectedSupplier));
+        }
+
+
+        if (supplierItems == null || !supplierItems.Any())
+        {
+            throw new ArgumentException("No items provided for the supplier bill.", nameof(supplierItems));
+        }
+
+        if (totalAmount <= 0)
+        {
+            throw new ArgumentException("Total amount must be greater than zero.", nameof(totalAmount));
+        }
+
+
+        totalAmount = Math.Round(totalAmount, 2);
+        var userName = await CookieUtility.GetUserFromCookieAsync(httpContextAccessor);
+        var user = await userService.GetUserByUsernameAsync(userName);
+
+        var result=   await supplierBillsService.CreateSupplierBill(SelectedSupplier.Value, supplierItems, totalAmount ,user);
+        if (result!=null)
+        {
+            navigationManager.NavigateTo($"/supplierprofile/{result.SupplierId}");
+        }
+
+    }
+    public  void AddSupplier()
+    {
+        navigationManager.NavigateTo("/addsupplier");
+    }
+
+    public void RemoveItem(SupplierItem item)
+    {
+        var existingSupplierItem = supplierItems.FirstOrDefault(si => si.ProductId == item.ProductId);
+        if (existingSupplierItem != null)
+        {
+            supplierItems.Remove(existingSupplierItem);
+        }
+        StateHasChanged();
+    }
+
+}

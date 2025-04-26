@@ -1,0 +1,114 @@
+﻿@page "/customers"
+@rendermode InteractiveServer
+ 
+<div class="top-row-section">
+
+    <h3 class="heading-1">Customers</h3>
+
+    <button class="btn btn-outline-primary btn-style" @onclick="ShowPaymentModal">
+         Add Customer
+    </button>
+
+</div>
+
+@if (isCardVisible)
+{
+    <POS1.Components.Pages.Customer.AddCustomers CloseMethod="async () => ClosePaymentModal()"  />
+}
+
+<div class="search">
+    <input type="text" name="search" @bind-value="query" placeholder="Search Customers"
+           class="search-input-style  form-control" @oninput="FilterCustomers" />
+
+</div>
+
+@if (customers != null)
+{
+    <div class="all-items">
+     @*    @foreach (var customer in customers)
+        {
+            <div class="item-details" @onclick="()=>customerPage(customer)">
+                <div>
+                    <strong>Customer Name:</strong>
+                    @customer.Name
+                </div>
+                <div>
+                    <strong> Customer Contact:</strong>
+                    @customer.Phone
+                </div>
+                <div>
+                    <strong>Customer Address:</strong> @customer.Address
+                </div>
+
+            </div>
+        } *@
+        <table class="table  table-hover">
+            <thead>
+                <tr>
+                    <th>Customer Name</th>
+                    <th>Customer Contact</th>
+                    <th>Customer Address</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var customer in customers)
+                {
+                    <tr @onclick="() => customerPage(customer)">
+                        <td>@customer.Name</td>
+                        <td>@customer.Phone</td>
+                        <td>@customer.Address</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+}
+
+@code {
+    private List<Customer> customers;
+    private List<Customer> dupliCustomers;
+    private string query;
+    public User user;
+    private bool isCardVisible = false;
+    protected override async Task OnInitializedAsync()
+    {
+        var userName = await CookieUtility.GetUserFromCookieAsync(httpContextAccessor);
+       user = await userService.GetUserByUsernameAsync(userName);
+        customers = await customerService.GetAllCustomersByTenentId(user.TenantID);
+        dupliCustomers = customers;
+    }
+
+    private void FilterCustomers(ChangeEventArgs e)
+    {
+        query = e.Value.ToString();
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            customers = dupliCustomers;
+        }
+        else
+        {
+            customers = dupliCustomers.Where(s => s.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                                                 s.Phone.Contains(query, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+    }
+    public void customerPage(Customer customer)
+    {
+        NavigationManager.NavigateTo($"/customerprofile/{customer.Id}");
+    }
+
+    private void ShowPaymentModal()
+    {
+        isCardVisible = true;
+    }
+
+    private async Task ClosePaymentModal()
+    {
+        isCardVisible = false;
+        customers = await customerService.GetAllCustomersByTenentId(user.TenantID);
+        dupliCustomers = customers;
+        StateHasChanged();
+    }
+
+
+}

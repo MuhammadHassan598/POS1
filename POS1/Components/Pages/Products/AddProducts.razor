@@ -1,0 +1,158 @@
+﻿@page "/addproducts"
+@rendermode InteractiveServer
+@inject IJSRuntime JSRuntime
+@inject POS1.Services.ProductTypeServices productTypeService
+@inject POS1.Services.ProductServices productService
+@inject POS1.Services.UserServices userService
+@inject IHttpContextAccessor httpContextAccessor
+@inject ApplicationDbContext dbContext
+@inject NavigationManager NavigationManager
+<style>
+   .form-control, option {
+        border-color: #0091ff;
+        font-weight: 500;
+        height: 50px;
+        font-size: 18px;
+        border-radius:10px;
+    }
+</style>
+
+<div class="top-row-section">
+    <h3 class="heading-1">Add Products</h3>
+    <button class="btn btn-outline-primary btn-style" @onclick="ShowTypeModal">Add Product Type</button>
+</div>
+
+@if (isTypeModalVisible)
+{
+    <POS1.Components.Pages.Products.AddProductType CloseMethod="async () => CloseTypeModal()" />
+}
+<POS1.Components.Pages.AlertComponent SuccessMessage="@SuccessMessage" ErrorMessage="@ErrorMessage" />
+
+<div class="container">
+    <form method="post" @formname="Add-Product-form" @onsubmit="AddProduct">
+        <AntiforgeryToken />
+        <div class="form">
+            <div class="form-group  ">
+                <label for="name" class="form-label-style">Product Name: <span class="required">*</span>  </label>
+                <InputText type="text" class="form-control form-input-style" id="name" @bind-Value="Products!.Name"
+                           placeholder="Enter product name"
+                           Required />
+
+            </div>
+
+
+            <div class="form-group">
+                <label for="description" class="form-label-style">Description: <span class="required">*</span>  </label>
+                <InputText type="text" class="form-control form-input-style" id="description" @bind-Value="Products!.Description"
+                           placeholder="Enter product description" Required />
+            </div>
+
+            <div class="form-group ">
+                <label for="quantityUnit" class="form-label-style">Unit:<span class="required">*</span></label>
+                <select class="form-control" @bind="Products!.QuantityUnit">
+                    <option value="" disabled>Select unit</option>
+                    @foreach (var unit in Enum.GetValues(typeof(QuantityUnit)))
+                    {
+                        <option value="@unit">@unit</option>
+                    }
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="barcode" class="form-label-style">Barcode:  </label>
+                <InputText type="text" class="form-control form-input-style" id="barcode" @bind-Value="Products!.Barcode"
+                           placeholder="Enter product barcode" />
+            </div>
+
+
+
+            <div class="form-group">
+                <label for="productType" class="form-label-style">Product Type:<span class="required">*</span></label>
+                <select class="form-control" @bind="Products!.ProductTypeId">
+                    <option value="">Select Product Type</option>
+                    @foreach (var productType in ProductTypes)
+                    {
+                        <option value="@productType.Id">@productType.TypeName</option>
+                    }
+                </select>
+            </div>
+
+
+            <div class="form-group ">
+                <button type="submit" class="btn btn-primary form-btn">Add Product</button>
+            </div>
+
+
+     
+        </div>
+    </form>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    public Product Products { get; set; } = new();
+    public List<ProductType> ProductTypes { get; set; } = new List<ProductType>();
+    public bool ShowError { get; set; } = false;
+    public String ErrorMessage { get; set; } 
+    public String SuccessMessage { get; set; } 
+    private bool isTypeModalVisible = false;
+
+
+    private async Task AddProduct() {
+
+        if (string.IsNullOrEmpty(Products.Name) || Products.ProductTypeId == null ||
+     Products.QuantityUnit == null || string.IsNullOrEmpty(Products.Description))
+        {
+            SuccessMessage = null;
+            ErrorMessage = "Please fill out all required fields.";
+            return;
+        }
+        try
+        {
+            var userName = await CookieUtility.GetUserFromCookieAsync(httpContextAccessor);
+            var user = await userService.GetUserByUsernameAsync(userName);
+            Products.TenantId = user.TenantID;
+            Products.IsActive = true;
+
+            var result = await productService.CreateProductAsync(Products, user);
+
+            if (result != null)
+            {
+                NavigationManager.NavigateTo("/products");
+
+            }
+            else
+            {
+                ErrorMessage = "Something went wrong while adding the product.";
+                SuccessMessage = string.Empty;
+            }
+
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Error: {ex.Message}";
+            SuccessMessage = null;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var userName = await CookieUtility.GetUserFromCookieAsync(httpContextAccessor);
+        var user = await userService.GetUserByUsernameAsync(userName);
+        var productTypes = await productTypeService.GetAllProductTypesAsync(user.TenantID);
+        ProductTypes = productTypes.ToList();
+    }
+
+    private void ShowTypeModal()
+    {
+        isTypeModalVisible = true;
+    }
+
+    private async Task CloseTypeModal()
+    {
+        isTypeModalVisible = false;
+        await OnInitializedAsync();  
+        StateHasChanged();  
+    }
+
+}

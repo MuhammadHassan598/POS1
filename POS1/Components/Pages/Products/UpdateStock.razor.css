@@ -1,0 +1,27 @@
+﻿
+.rz-dropdown-items li {
+    font-size: 18px;
+    font-weight: 500;
+}
+
+.rz-dropdown-filter-container .rz-inputtext {
+    height: 35px;
+    font-size: 18px;
+    font-weight: 500;
+    background-color: #e0e4ed;
+}
+
+.rz-dropdown-trigger {
+    width: 41px;
+    padding-bottom: 10px;
+}
+    /* Custom styles for RadzenDropDown icon */
+    .rz-dropdown-trigger .rzi-chevron-down:before {
+        font-size: 34px;
+    }
+
+i.rzi {
+    margin-right: 20px;
+}
+
+ 
